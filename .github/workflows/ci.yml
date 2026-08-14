@@ -68,3 +68,20 @@ jobs:
           python -m gtmkit.funnel --target-revenue 4000000 --acv 45000 \
             --stage "visit:0.08" --stage "mql:0.25" --stage "opp:0.28" \
             --cpm 22 --audience-ceiling 40000000
+
+  lint-python:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Pinned deliberately. An unpinned linter means CI enforces whatever
+      # rules shipped this morning, so a build breaks on a commit that changed
+      # nothing — and the person who has to fix it did not choose to upgrade.
+      - run: pip install ruff==0.16.3
+      - name: Lint
+        run: ruff check --output-format=github .
+      - name: Formatting is consistent
+        run: ruff format --check --diff .
