@@ -17,7 +17,7 @@ import ast
 import math
 from typing import Any, Dict, Mapping
 
-__all__ = ["evaluate", "ExpressionError", "FUNCTIONS"]
+__all__ = ["FUNCTIONS", "ExpressionError", "evaluate"]
 
 
 class ExpressionError(ValueError):
@@ -88,13 +88,10 @@ def evaluate(expression: str, variables: Mapping[str, float]) -> float:
 
 def _eval_node(node: ast.AST, variables: Mapping[str, float], src: str) -> Any:
     if isinstance(node, ast.Constant):
-        if isinstance(node.value, (int, float)) and not isinstance(
-            node.value, bool
-        ):
+        if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
             return node.value
         raise ExpressionError(
-            "only numeric literals are allowed in formulas, found %r"
-            % (node.value,)
+            "only numeric literals are allowed in formulas, found %r" % (node.value,)
         )
 
     if isinstance(node, ast.Name):
@@ -102,8 +99,7 @@ def _eval_node(node: ast.AST, variables: Mapping[str, float], src: str) -> Any:
             return variables[node.id]
         if node.id in FUNCTIONS:
             raise ExpressionError(
-                "%r is a function and must be called, e.g. %s(...)"
-                % (node.id, node.id)
+                "%r is a function and must be called, e.g. %s(...)" % (node.id, node.id)
             )
         known = ", ".join(sorted(variables)) or "(none defined)"
         raise ExpressionError(
@@ -114,8 +110,7 @@ def _eval_node(node: ast.AST, variables: Mapping[str, float], src: str) -> Any:
     if isinstance(node, ast.BinOp):
         if not isinstance(node.op, _ALLOWED_BINOPS):
             raise ExpressionError(
-                "operator %s is not allowed in formulas"
-                % type(node.op).__name__
+                "operator %s is not allowed in formulas" % type(node.op).__name__
             )
         left = _eval_node(node.left, variables, src)
         right = _eval_node(node.right, variables, src)
@@ -123,8 +118,7 @@ def _eval_node(node: ast.AST, variables: Mapping[str, float], src: str) -> Any:
             return _apply_binop(node.op, left, right)
         except ZeroDivisionError:
             raise ExpressionError(
-                "division by zero in formula %r — check the denominator input"
-                % src
+                "division by zero in formula %r — check the denominator input" % src
             )
 
     if isinstance(node, ast.UnaryOp):
@@ -161,13 +155,9 @@ def _eval_node(node: ast.AST, variables: Mapping[str, float], src: str) -> Any:
         name = node.func.id
         if name not in FUNCTIONS:
             allowed = ", ".join(sorted(FUNCTIONS))
-            raise ExpressionError(
-                "unknown function %r. Allowed: %s" % (name, allowed)
-            )
+            raise ExpressionError("unknown function %r. Allowed: %s" % (name, allowed))
         if node.keywords:
-            raise ExpressionError(
-                "keyword arguments are not supported in formulas"
-            )
+            raise ExpressionError("keyword arguments are not supported in formulas")
         args = [_eval_node(arg, variables, src) for arg in node.args]
         try:
             return FUNCTIONS[name](*args)
@@ -177,8 +167,7 @@ def _eval_node(node: ast.AST, variables: Mapping[str, float], src: str) -> Any:
             ) from exc
 
     raise ExpressionError(
-        "expression element %s is not allowed in formulas"
-        % type(node).__name__
+        "expression element %s is not allowed in formulas" % type(node).__name__
     )
 
 
@@ -202,7 +191,7 @@ def _apply_binop(op: ast.AST, left: Any, right: Any) -> Any:
                 "exponent %r is too large; business-case formulas should not "
                 "need powers above 64" % (right,)
             )
-        return left ** right
+        return left**right
     raise ExpressionError("unsupported operator %s" % type(op).__name__)
 
 

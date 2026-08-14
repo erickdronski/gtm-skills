@@ -7,7 +7,6 @@ produces. All three are worse than a failing function, because they are only
 discovered by a user.
 """
 
-import io
 import json
 import os
 import re
@@ -16,8 +15,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gtmkit import funnel, pricing, scoring, sizing, valuecase  # noqa: E402
-from tools import validate_skills  # noqa: E402
+from gtmkit import pricing, scoring, sizing, valuecase
+from tools import validate_skills
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILLS_DIR = os.path.join(REPO_ROOT, "skills")
@@ -28,8 +27,7 @@ def skill_dirs():
     return sorted(
         os.path.join(SKILLS_DIR, entry)
         for entry in os.listdir(SKILLS_DIR)
-        if os.path.isdir(os.path.join(SKILLS_DIR, entry))
-        and not entry.startswith(".")
+        if os.path.isdir(os.path.join(SKILLS_DIR, entry)) and not entry.startswith(".")
     )
 
 
@@ -53,7 +51,7 @@ class TestSkillLinter(unittest.TestCase):
         A linter that passes everything is indistinguishable from no linter,
         so this asserts it has teeth rather than just that it returns clean.
         """
-        findings = validate_skills.Findings()
+        validate_skills.Findings()
         frontmatter, _ = validate_skills.parse_frontmatter("no frontmatter here")
         self.assertEqual(frontmatter, {})
 
@@ -68,9 +66,7 @@ class TestShippedExamplesStillRun(unittest.TestCase):
 
     def test_value_case_example(self):
         case = valuecase.load_spec(
-            os.path.join(
-                EXAMPLES, "value-case", "northwind-support-deflection.json"
-            )
+            os.path.join(EXAMPLES, "value-case", "northwind-support-deflection.json")
         )
         self.assertGreater(case.summary()["npv"], 0)
 
@@ -79,9 +75,7 @@ class TestShippedExamplesStillRun(unittest.TestCase):
             os.path.join(EXAMPLES, "icp", "rubric.json"), encoding="utf-8"
         ) as handle:
             rubric = scoring.Rubric(json.load(handle))
-        records = scoring.load_records(
-            os.path.join(EXAMPLES, "icp", "accounts.csv")
-        )
+        records = scoring.load_records(os.path.join(EXAMPLES, "icp", "accounts.csv"))
         results = scoring.score_all(rubric, records)
         self.assertEqual(len(results), len(records))
         # The example is built to exercise every branch of the tiering logic.
@@ -114,9 +108,7 @@ class TestShippedExamplesStillRun(unittest.TestCase):
         self.assertTrue(result["reconciliation"]["agrees"])
 
     def test_pricing_example(self):
-        rows = scoring.load_records(
-            os.path.join(EXAMPLES, "pricing", "responses.csv")
-        )
+        rows = scoring.load_records(os.path.join(EXAMPLES, "pricing", "responses.csv"))
         result = pricing.analyze(rows)
         self.assertGreater(result["sample"]["usable"], 100)
         # The example deliberately includes malformed rows so the rejection
@@ -187,16 +179,12 @@ class TestReadmeStaysHonest(unittest.TestCase):
     """The README quotes generated output. It must still be generated."""
 
     def setUp(self):
-        with open(
-            os.path.join(REPO_ROOT, "README.md"), encoding="utf-8"
-        ) as handle:
+        with open(os.path.join(REPO_ROOT, "README.md"), encoding="utf-8") as handle:
             self.readme = handle.read()
 
     def test_quoted_headline_numbers_match_the_example(self):
         case = valuecase.load_spec(
-            os.path.join(
-                EXAMPLES, "value-case", "northwind-support-deflection.json"
-            )
+            os.path.join(EXAMPLES, "value-case", "northwind-support-deflection.json")
         )
         markdown = case.to_markdown()
         for quoted in ("$105.2k", "2 yr 4 mo", "$579.7k"):
@@ -204,8 +192,7 @@ class TestReadmeStaysHonest(unittest.TestCase):
                 self.assertIn(
                     quoted,
                     markdown,
-                    "README quotes %r but the example no longer produces it"
-                    % quoted,
+                    "README quotes %r but the example no longer produces it" % quoted,
                 )
                 self.assertIn(quoted, self.readme)
 

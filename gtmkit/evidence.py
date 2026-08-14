@@ -39,8 +39,8 @@ __all__ = [
     "CONFIDENCE_LEVELS",
     "EvidenceError",
     "Input",
-    "validate_input",
     "grade_evidence",
+    "validate_input",
     "weasel_phrases",
 ]
 
@@ -81,11 +81,7 @@ _MIN_SOURCE_CHARS = 12
 def weasel_phrases(source: str) -> List[str]:
     """Return the weasel patterns a source string matches, if any."""
     text = (source or "").strip()
-    return [
-        pattern.pattern
-        for pattern in _WEASEL_RE
-        if pattern.search(text)
-    ]
+    return [pattern.pattern for pattern in _WEASEL_RE if pattern.search(text)]
 
 
 class Input:
@@ -96,14 +92,14 @@ class Input:
     """
 
     __slots__ = (
-        "name",
-        "value",
         "confidence",
-        "source",
-        "low",
         "high",
-        "unit",
+        "low",
+        "name",
         "note",
+        "source",
+        "unit",
+        "value",
     )
 
     def __init__(
@@ -177,9 +173,7 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
         raise EvidenceError("input %r is missing 'value'" % name)
     value = raw["value"]
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise EvidenceError(
-            "input %r has a non-numeric value %r" % (name, value)
-        )
+        raise EvidenceError("input %r has a non-numeric value %r" % (name, value))
 
     confidence = str(raw.get("confidence", "")).strip().lower()
     if confidence not in CONFIDENCE_LEVELS:
@@ -208,16 +202,13 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
             "source for %r reads as an unfalsifiable claim: %r. Replace it "
             "with a specific artifact (a named export, dashboard, contract, "
             "or a stated derivation). If the number really is unmeasured, "
-            "mark it confidence='assumption' and give it a range."
-            % (name, source)
+            "mark it confidence='assumption' and give it a range." % (name, source)
         )
 
     low = raw.get("low")
     high = raw.get("high")
     if low is not None and high is not None and low > high:
-        raise EvidenceError(
-            "input %r has low (%r) above high (%r)" % (name, low, high)
-        )
+        raise EvidenceError("input %r has low (%r) above high (%r)" % (name, low, high))
     for bound_name, bound in (("low", low), ("high", high)):
         if bound is not None and (
             isinstance(bound, bool) or not isinstance(bound, (int, float))
@@ -228,16 +219,14 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
     if low is not None and high is not None and not (low <= value <= high):
         raise EvidenceError(
             "input %r has a base value (%r) outside its own range [%r, %r]. "
-            "Either the base case or the range is wrong."
-            % (name, value, low, high)
+            "Either the base case or the range is wrong." % (name, value, low, high)
         )
 
     if confidence == "assumption" and (low is None or high is None):
         raise EvidenceError(
             "input %r is an assumption and needs both 'low' and 'high'. An "
             "unbounded assumption cannot be stress-tested, and a business "
-            "case whose assumptions cannot be stress-tested is a brochure."
-            % name
+            "case whose assumptions cannot be stress-tested is a brochure." % name
         )
 
     return Input(
@@ -278,14 +267,14 @@ def grade_evidence(
         pairs.append((confidence, abs(float(value))))
 
     total = sum(value for _, value in pairs)
-    shares = {level: 0.0 for level in CONFIDENCE_LEVELS}
+    shares = dict.fromkeys(CONFIDENCE_LEVELS, 0.0)
     for confidence, value in pairs:
         shares[confidence] += value
 
     if total > 0:
         shares = {k: v / total for k, v in shares.items()}
     else:
-        shares = {k: 0.0 for k in shares}
+        shares = dict.fromkeys(shares, 0.0)
 
     measured = shares["fact"] + 0.5 * shares["inference"]
     if total == 0:
@@ -326,8 +315,7 @@ def _grade_headline(letter: str, shares: Mapping[str, float]) -> str:
     return (
         "Grade %s. %d%% of modeled value rests on assumptions and only %d%% on "
         "measured facts. State this before the reader finds it, and prioritize "
-        "measuring the largest assumption."
-        % (letter, assumption_pct, fact_pct)
+        "measuring the largest assumption." % (letter, assumption_pct, fact_pct)
     )
 
 

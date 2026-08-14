@@ -38,13 +38,13 @@ Every CLI is invoked the same way::
 __version__ = "0.1.0"
 
 __all__ = [
-    "finance",
     "evidence",
     "expr",
-    "valuecase",
+    "finance",
+    "fmt",
     "funnel",
-    "sizing",
     "pricing",
     "scoring",
-    "fmt",
+    "sizing",
+    "valuecase",
 ]

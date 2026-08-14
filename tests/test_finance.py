@@ -148,9 +148,7 @@ class TestBreakEven(unittest.TestCase):
         self.assertIsNone(finance.break_even_multiplier(0.1, [0, 0], [100, 0]))
 
     def test_no_costs_breaks_even_immediately(self):
-        self.assertEqual(
-            finance.break_even_multiplier(0.1, [0, 100], [0, 0]), 0.0
-        )
+        self.assertEqual(finance.break_even_multiplier(0.1, [0, 100], [0, 0]), 0.0)
 
 
 class TestRates(unittest.TestCase):
@@ -163,9 +161,7 @@ class TestRates(unittest.TestCase):
     def test_round_trip(self):
         annual = 0.15
         monthly = finance.periodic_rate(annual, 12)
-        self.assertAlmostEqual(
-            finance.annualized_rate(monthly, 12), annual, places=10
-        )
+        self.assertAlmostEqual(finance.annualized_rate(monthly, 12), annual, places=10)
 
     def test_rejects_zero_periods(self):
         with self.assertRaises(finance.InvalidCashFlows):

@@ -34,7 +34,7 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from .fmt import fmt_count, fmt_currency, fmt_pct, table
+from .fmt import fmt_count, fmt_currency, table
 
 __all__ = ["PricingError", "analyze", "main"]
 
@@ -55,12 +55,12 @@ class Response:
         self.too_expensive = too_expensive
 
     def is_monotonic(self) -> bool:
-        return (
-            self.too_cheap <= self.cheap <= self.expensive <= self.too_expensive
-        )
+        return self.too_cheap <= self.cheap <= self.expensive <= self.too_expensive
 
 
-def parse_responses(rows: Sequence[Dict[str, Any]]) -> Tuple[List[Response], List[Dict[str, Any]]]:
+def parse_responses(
+    rows: Sequence[Dict[str, Any]],
+) -> Tuple[List[Response], List[Dict[str, Any]]]:
     """Split raw rows into valid responses and rejected rows with reasons."""
     valid: List[Response] = []
     rejected: List[Dict[str, Any]] = []
@@ -107,7 +107,9 @@ def parse_responses(rows: Sequence[Dict[str, Any]]) -> Tuple[List[Response], Lis
     return valid, rejected
 
 
-def _curves(responses: Sequence[Response], grid: Sequence[float]) -> Dict[str, List[float]]:
+def _curves(
+    responses: Sequence[Response], grid: Sequence[float]
+) -> Dict[str, List[float]]:
     """Cumulative share of respondents at each grid price.
 
     ``too_cheap`` and ``cheap`` are descending curves (share who consider the
@@ -116,13 +118,9 @@ def _curves(responses: Sequence[Response], grid: Sequence[float]) -> Dict[str, L
     """
     n = float(len(responses))
     return {
-        "too_cheap": [
-            sum(1 for r in responses if r.too_cheap >= p) / n for p in grid
-        ],
+        "too_cheap": [sum(1 for r in responses if r.too_cheap >= p) / n for p in grid],
         "cheap": [sum(1 for r in responses if r.cheap >= p) / n for p in grid],
-        "expensive": [
-            sum(1 for r in responses if r.expensive <= p) / n for p in grid
-        ],
+        "expensive": [sum(1 for r in responses if r.expensive <= p) / n for p in grid],
         "too_expensive": [
             sum(1 for r in responses if r.too_expensive <= p) / n for p in grid
         ],
@@ -180,9 +178,7 @@ def analyze(rows: Sequence[Dict[str, Any]], currency: str = "USD") -> Dict[str, 
 
     n = len(responses)
     total = n + len(rejected)
-    reliability = (
-        "strong" if n >= 200 else "usable" if n >= 50 else "indicative only"
-    )
+    reliability = "strong" if n >= 200 else "usable" if n >= 50 else "indicative only"
 
     return {
         "currency": currency,
@@ -202,9 +198,7 @@ def analyze(rows: Sequence[Dict[str, Any]], currency: str = "USD") -> Dict[str, 
             "point_of_marginal_expensiveness": pme,
         },
         "acceptable_range": {"low": pmc, "high": pme},
-        "range_width_pct": (
-            ((pme - pmc) / pmc) if (pmc and pme and pmc > 0) else None
-        ),
+        "range_width_pct": (((pme - pmc) / pmc) if (pmc and pme and pmc > 0) else None),
         "interpretation": _interpretation(pmc, opp, ipp, pme, currency),
     }
 
@@ -224,8 +218,7 @@ def _reliability_note(n: int, reliability: str) -> str:
     return (
         "%d usable responses — below the threshold where these intersections "
         "are stable. Use this to shape the next conversation, not to set a "
-        "price. Every number below will move with the next twenty responses."
-        % n
+        "price. Every number below will move with the next twenty responses." % n
     )
 
 
@@ -260,7 +253,8 @@ def _interpretation(
                 "Indifference sits above the optimal point (%s vs %s), which "
                 "typically signals a brand or category where buyers read price "
                 "as a quality signal. There is room to price toward the upper "
-                "half of the band." % (fmt_currency(ipp, currency), fmt_currency(opp, currency))
+                "half of the band."
+                % (fmt_currency(ipp, currency), fmt_currency(opp, currency))
             )
         else:
             parts.append(
@@ -337,15 +331,12 @@ def to_markdown(result: Dict[str, Any]) -> str:
         )
         lines.append("")
         reject_rows = [
-            [str(item["row"]), item["reason"]]
-            for item in result["rejected_rows"][:25]
+            [str(item["row"]), item["reason"]] for item in result["rejected_rows"][:25]
         ]
         lines.append(table(["Row", "Reason"], reject_rows))
         if len(result["rejected_rows"]) > 25:
             lines.append("")
-            lines.append(
-                "_...and %d more._" % (len(result["rejected_rows"]) - 25)
-            )
+            lines.append("_...and %d more._" % (len(result["rejected_rows"]) - 25))
         lines.append("")
 
     lines.append("---")
@@ -391,9 +382,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     output = (
-        json.dumps(result, indent=2)
-        if args.format == "json"
-        else to_markdown(result)
+        json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:

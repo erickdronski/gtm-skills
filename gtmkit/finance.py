@@ -21,23 +21,23 @@ Conventions used throughout:
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence
 
 __all__ = [
-    "npv",
-    "irr",
-    "payback_period",
-    "discounted_payback_period",
-    "roi",
+    "InvalidCashFlows",
     "annualized_rate",
-    "periodic_rate",
-    "cumulative",
-    "present_value",
-    "break_even_value",
     "break_even_multiplier",
+    "break_even_value",
+    "cumulative",
+    "discounted_payback_period",
+    "irr",
+    "npv",
+    "payback_period",
+    "periodic_rate",
+    "present_value",
+    "roi",
     "sign_changes",
     "summarize",
-    "InvalidCashFlows",
 ]
 
 
@@ -146,11 +146,7 @@ def irr(
 def sign_changes(cash_flows: Sequence[float]) -> int:
     """Count sign changes, to detect cash flow shapes where IRR is ambiguous."""
     flows = [v for v in _validate(cash_flows) if v != 0]
-    return sum(
-        1
-        for a, b in zip(flows, flows[1:])
-        if (a > 0) != (b > 0)
-    )
+    return sum(1 for a, b in zip(flows, flows[1:]) if (a > 0) != (b > 0))
 
 
 def cumulative(cash_flows: Sequence[float]) -> List[float]:
@@ -260,12 +256,8 @@ def break_even_value(
     if period_weights is not None and len(period_weights) != len(flows):
         raise InvalidCashFlows("period_weights must match cash_flows length")
 
-    cost_npv = sum(
-        present_value(v, rate, i) for i, v in enumerate(flows) if v < 0
-    )
-    benefit_npv = sum(
-        present_value(v, rate, i) for i, v in enumerate(flows) if v > 0
-    )
+    cost_npv = sum(present_value(v, rate, i) for i, v in enumerate(flows) if v < 0)
+    benefit_npv = sum(present_value(v, rate, i) for i, v in enumerate(flows) if v > 0)
     if benefit_npv <= 0:
         return None
     multiplier = -cost_npv / benefit_npv
@@ -292,9 +284,7 @@ def break_even_multiplier(
     breaks even". Returns ``None`` when benefits have no present value to
     shrink, and ``0.0`` when the case clears zero with no benefits at all.
     """
-    benefit_npv = sum(
-        present_value(v, rate, i) for i, v in enumerate(benefit_flows)
-    )
+    benefit_npv = sum(present_value(v, rate, i) for i, v in enumerate(benefit_flows))
     cost_npv = sum(present_value(v, rate, i) for i, v in enumerate(cost_flows))
     if benefit_npv <= 0:
         return None

@@ -164,17 +164,13 @@ def check_skill(directory: str, findings: Findings) -> None:
             "references/ and point at it" % (line_count, MAX_SKILL_LINES),
         )
     elif line_count > MAX_SKILL_LINES * 0.85:
-        findings.warn(
-            name, "SKILL.md is %d lines, approaching the budget" % line_count
-        )
+        findings.warn(name, "SKILL.md is %d lines, approaching the budget" % line_count)
 
     # -- placeholders ----------------------------------------------------
     prose = strip_code(text)
     for placeholder in PLACEHOLDERS:
         if placeholder in prose:
-            findings.error(
-                name, "contains an unresolved placeholder: %s" % placeholder
-            )
+            findings.error(name, "contains an unresolved placeholder: %s" % placeholder)
 
     # -- referenced files ------------------------------------------------
     referenced = set()
@@ -201,9 +197,7 @@ def check_skill(directory: str, findings: Findings) -> None:
         module = match.group(1)
         module_path = os.path.join(REPO_ROOT, "gtmkit", "%s.py" % module)
         if not os.path.isfile(module_path):
-            findings.error(
-                name, "invokes gtmkit.%s, which does not exist" % module
-            )
+            findings.error(name, "invokes gtmkit.%s, which does not exist" % module)
 
     # -- reference files get a light check of their own -------------------
     references_dir = os.path.join(directory, "references")
@@ -238,8 +232,7 @@ def main() -> int:
     directories = sorted(
         os.path.join(SKILLS_DIR, entry)
         for entry in os.listdir(SKILLS_DIR)
-        if os.path.isdir(os.path.join(SKILLS_DIR, entry))
-        and not entry.startswith(".")
+        if os.path.isdir(os.path.join(SKILLS_DIR, entry)) and not entry.startswith(".")
     )
 
     if not directories:

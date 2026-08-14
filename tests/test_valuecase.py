@@ -9,7 +9,6 @@ import json
 import os
 import unittest
 
-from gtmkit import finance
 from gtmkit.valuecase import SpecError, load_spec, validate_spec
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -274,8 +273,8 @@ class TestShippedExample(unittest.TestCase):
         implying 20 agents. Exactly the kind of quiet inconsistency this whole
         pack exists to catch, so it is pinned here.
         """
-        attrition = [d for d in self.case.drivers if d.id == "attrition"][0]
-        deflection = [d for d in self.case.drivers if d.id == "deflection"][0]
+        attrition = next(d for d in self.case.drivers if d.id == "attrition")
+        deflection = next(d for d in self.case.drivers if d.id == "deflection")
         agents = attrition.inputs["agents"].value
         tickets = deflection.inputs["tickets_per_year"].value
         implied_per_agent = tickets / agents

@@ -38,7 +38,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 from .evidence import EvidenceError, validate_input
 from .fmt import fmt_count, fmt_currency, fmt_pct, table
 
-__all__ = ["SizingError", "size", "main"]
+__all__ = ["SizingError", "main", "size"]
 
 
 class SizingError(ValueError):
@@ -96,7 +96,9 @@ def size(spec: Mapping[str, Any]) -> Dict[str, Any]:
     som_share = _fraction(spec.get("som_share"), "som_share", default=None)
 
     sam = tam * sam_share if sam_share is not None else None
-    som = (sam if sam is not None else tam) * som_share if som_share is not None else None
+    som = (
+        (sam if sam is not None else tam) * som_share if som_share is not None else None
+    )
 
     return {
         "name": name,
@@ -232,10 +234,7 @@ def _reconcile(
         }
 
     a, b = bottom["tam"], top["tam"]
-    if min(a, b) <= 0:
-        ratio = None
-    else:
-        ratio = max(a, b) / min(a, b)
+    ratio = None if min(a, b) <= 0 else max(a, b) / min(a, b)
 
     if ratio is None:
         verdict = "One method produced a non-positive size; check the inputs."
@@ -329,8 +328,7 @@ def to_markdown(result: Mapping[str, Any]) -> str:
             [
                 "SAM",
                 fmt_currency(result["sam"], cur),
-                "%s of TAM — the slice sellable today"
-                % fmt_pct(result["sam_share"]),
+                "%s of TAM — the slice sellable today" % fmt_pct(result["sam_share"]),
             ]
         )
     if result["som"] is not None:
@@ -383,9 +381,7 @@ def to_markdown(result: Mapping[str, Any]) -> str:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python3 -m gtmkit.sizing",
-        description=(
-            "Size a market bottom-up and top-down, and reconcile the two."
-        ),
+        description=("Size a market bottom-up and top-down, and reconcile the two."),
     )
     parser.add_argument("--spec", required=True, help="path to the sizing JSON spec")
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
@@ -407,9 +403,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     output = (
-        json.dumps(result, indent=2)
-        if args.format == "json"
-        else to_markdown(result)
+        json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:

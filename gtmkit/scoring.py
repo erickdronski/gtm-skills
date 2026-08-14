@@ -52,7 +52,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from .fmt import fmt_pct, table
 
-__all__ = ["RubricError", "Rubric", "score_record", "score_all", "main"]
+__all__ = ["Rubric", "RubricError", "main", "score_all", "score_record"]
 
 _MISSING = (None, "", "unknown", "n/a", "na", "null", "-", "?")
 
@@ -63,16 +63,16 @@ class RubricError(ValueError):
 
 class Criterion:
     __slots__ = (
+        "bands",
+        "default",
+        "false_score",
         "id",
         "label",
-        "weight",
-        "type",
-        "bands",
-        "true_score",
-        "false_score",
         "map",
-        "default",
         "note",
+        "true_score",
+        "type",
+        "weight",
     )
 
     def __init__(self, raw: Mapping[str, Any], scale: float) -> None:
@@ -103,8 +103,7 @@ class Criterion:
             bands = raw.get("bands")
             if not isinstance(bands, list) or not bands:
                 raise RubricError(
-                    "numeric criterion %r needs a non-empty 'bands' array"
-                    % self.id
+                    "numeric criterion %r needs a non-empty 'bands' array" % self.id
                 )
             parsed = []
             for band in bands:
@@ -121,17 +120,13 @@ class Criterion:
                 )
             # Highest threshold first so the first match wins.
             parsed.sort(
-                key=lambda b: (b["min"] if b["min"] is not None else float("-inf")),
+                key=lambda b: b["min"] if b["min"] is not None else float("-inf"),
                 reverse=True,
             )
             self.bands = parsed
         elif self.type == "boolean":
-            self.true_score = _check_score(
-                raw.get("true_score", scale), scale, self.id
-            )
-            self.false_score = _check_score(
-                raw.get("false_score", 0), scale, self.id
-            )
+            self.true_score = _check_score(raw.get("true_score", scale), scale, self.id)
+            self.false_score = _check_score(raw.get("false_score", 0), scale, self.id)
         elif self.type == "categorical":
             mapping = raw.get("map")
             if not isinstance(mapping, Mapping) or not mapping:
@@ -185,9 +180,7 @@ class Criterion:
             return 0.0
 
         if self.type == "boolean":
-            truthy = str(value).strip().lower() in (
-                "true", "yes", "y", "1", "t"
-            )
+            truthy = str(value).strip().lower() in ("true", "yes", "y", "1", "t")
             return self.true_score if truthy else self.false_score
 
         key = str(value).strip().lower()
@@ -210,9 +203,7 @@ def _check_score(value: Any, scale: float, criterion_id: str) -> float:
 def _is_missing(value: Any) -> bool:
     if value is None:
         return True
-    if isinstance(value, str) and value.strip().lower() in _MISSING:
-        return True
-    return False
+    return bool(isinstance(value, str) and value.strip().lower() in _MISSING)
 
 
 class Rubric:
@@ -243,7 +234,16 @@ class Rubric:
                 raise RubricError("each disqualifier must be an object")
             field = item.get("field")
             op = item.get("op")
-            if not field or op not in ("<", "<=", ">", ">=", "==", "!=", "in", "not in"):
+            if not field or op not in (
+                "<",
+                "<=",
+                ">",
+                ">=",
+                "==",
+                "!=",
+                "in",
+                "not in",
+            ):
                 raise RubricError(
                     "disqualifier needs 'field' and a valid 'op' "
                     "(<, <=, >, >=, ==, !=, in, not in): %r" % (item,)
@@ -379,9 +379,7 @@ def score_record(rubric: Rubric, record: Mapping[str, Any]) -> Dict[str, Any]:
         "disqualifier_reason": disqualifier,
         "missing_criteria": missing,
         "detail": detail,
-        "confidence_note": _confidence_note(
-            coverage, missing, rubric.min_coverage
-        ),
+        "confidence_note": _confidence_note(coverage, missing, rubric.min_coverage),
     }
 
 
@@ -391,13 +389,10 @@ def _confidence_note(
     if coverage >= 0.999:
         return "Fully covered."
     if coverage >= min_coverage:
-        return "Missing %s — fill these before acting on the rank." % ", ".join(
-            missing
-        )
+        return "Missing %s — fill these before acting on the rank." % ", ".join(missing)
     return (
         "Only %s of scoring weight has data. This is not a low-fit record, it "
-        "is an unresearched one. Missing: %s"
-        % (fmt_pct(coverage), ", ".join(missing))
+        "is an unresearched one. Missing: %s" % (fmt_pct(coverage), ", ".join(missing))
     )
 
 
@@ -455,9 +450,7 @@ def to_markdown(
                 entry["disqualifier_reason"] or entry["confidence_note"],
             ]
         )
-    lines.append(
-        table(["Record", "Tier", "Fit", "Coverage", "Notes"], rows)
-    )
+    lines.append(table(["Record", "Tier", "Fit", "Coverage", "Notes"], rows))
     lines.append("")
 
     if unknown:
@@ -513,9 +506,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ),
     )
     parser.add_argument("--rubric", required=True, help="path to rubric JSON")
-    parser.add_argument(
-        "--records", required=True, help="path to records CSV or JSON"
-    )
+    parser.add_argument("--records", required=True, help="path to records CSV or JSON")
     parser.add_argument(
         "--name-field",
         default="name",

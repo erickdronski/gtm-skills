@@ -52,16 +52,12 @@ class TestFunnel(unittest.TestCase):
         self.assertAlmostEqual(result["cac"], 200.0)
 
     def test_audience_ceiling_flags_infeasible_plans(self):
-        result = plan(
-            1_000_000, 50_000, self.stages(), audience_ceiling=100
-        )
+        result = plan(1_000_000, 50_000, self.stages(), audience_ceiling=100)
         self.assertFalse(result["feasible"])
         self.assertIn("not reachable", result["ceiling_note"].lower())
 
     def test_feasible_plan_has_no_ceiling_note(self):
-        result = plan(
-            1_000_000, 50_000, self.stages(), audience_ceiling=10_000
-        )
+        result = plan(1_000_000, 50_000, self.stages(), audience_ceiling=10_000)
         self.assertTrue(result["feasible"])
         self.assertIsNone(result["ceiling_note"])
 
@@ -219,12 +215,12 @@ class TestPricing(unittest.TestCase):
         self.assertIn("ascending order", rejected[0]["reason"])
 
     def test_rejects_non_numeric(self):
-        valid, rejected = parse_responses([response("n/a", 40, 80, 120)])
+        _valid, rejected = parse_responses([response("n/a", 40, 80, 120)])
         self.assertEqual(len(rejected), 1)
         self.assertEqual(rejected[0]["reason"], "non-numeric price")
 
     def test_rejects_negative_prices(self):
-        valid, rejected = parse_responses([response(-5, 40, 80, 120)])
+        _valid, rejected = parse_responses([response(-5, 40, 80, 120)])
         self.assertEqual(len(rejected), 1)
 
     def test_accepts_monotonic_responses(self):
@@ -262,7 +258,7 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(result["sample"]["reliability"], "strong")
 
     def test_rejected_rows_are_counted_not_hidden(self):
-        rows = self.sample() + [response(100, 50, 30, 10)]
+        rows = [*self.sample(), response(100, 50, 30, 10)]
         result = analyze(rows)
         self.assertEqual(result["sample"]["rejected"], 1)
         self.assertEqual(len(result["rejected_rows"]), 1)
@@ -434,9 +430,7 @@ class TestScoring(unittest.TestCase):
     def test_rejects_disqualifier_without_reason(self):
         with self.assertRaises(RubricError) as ctx:
             Rubric(
-                rubric_dict(
-                    disqualifiers=[{"field": "size", "op": "<", "value": 5}]
-                )
+                rubric_dict(disqualifiers=[{"field": "size", "op": "<", "value": 5}])
             )
         self.assertIn("reason", str(ctx.exception))
 

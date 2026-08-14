@@ -69,15 +69,15 @@ from .evidence import (
     weakest_confidence,
 )
 from .expr import ExpressionError, evaluate, referenced_names
-from .fmt import fmt_currency, fmt_multiple, fmt_periods, fmt_pct, table
+from .fmt import fmt_currency, fmt_multiple, fmt_pct, fmt_periods, table
 
 __all__ = [
     "SpecError",
     "ValueCase",
-    "load_spec",
-    "validate_spec",
     "build",
+    "load_spec",
     "main",
+    "validate_spec",
 ]
 
 
@@ -88,7 +88,7 @@ class SpecError(ValueError):
 class Driver:
     """One benefit stream: a formula, its declared inputs, and its ramp."""
 
-    __slots__ = ("id", "label", "formula", "inputs", "ramp", "realization", "note")
+    __slots__ = ("formula", "id", "inputs", "label", "note", "ramp", "realization")
 
     def __init__(
         self,
@@ -170,12 +170,12 @@ class Driver:
             # Degenerate driver (constant formula, or all inputs inert).
             # Split evenly rather than divide by zero.
             even = 1.0 / len(self.inputs)
-            return {name: even for name in self.inputs}
+            return dict.fromkeys(self.inputs, even)
         return {name: value / total for name, value in movements.items()}
 
 
 class CostLine:
-    __slots__ = ("id", "label", "schedule", "note")
+    __slots__ = ("id", "label", "note", "schedule")
 
     def __init__(
         self, id: str, label: str, schedule: List[float], note: Optional[str] = None
@@ -337,9 +337,7 @@ class ValueCase:
         """
         contributions: List[Tuple[str, float]] = []
         for driver in self.drivers:
-            driver_npv = finance.npv(
-                self.discount_rate, driver.schedule(self.horizon)
-            )
+            driver_npv = finance.npv(self.discount_rate, driver.schedule(self.horizon))
             for name, share in driver.input_shares().items():
                 contributions.append(
                     (driver.inputs[name].confidence, driver_npv * share)
@@ -358,9 +356,7 @@ class ValueCase:
         """
         rows: List[Dict[str, Any]] = []
         for driver in self.drivers:
-            driver_npv = finance.npv(
-                self.discount_rate, driver.schedule(self.horizon)
-            )
+            driver_npv = finance.npv(self.discount_rate, driver.schedule(self.horizon))
             for name, share in driver.input_shares().items():
                 inp = driver.inputs[name]
                 rows.append(
@@ -380,9 +376,7 @@ class ValueCase:
     def _largest_assumption(self) -> Optional[Dict[str, Any]]:
         """The single assumption worth spending a week measuring."""
         candidates = [
-            row
-            for row in self.sensitivity()
-            if row["confidence"] == "assumption"
+            row for row in self.sensitivity() if row["confidence"] == "assumption"
         ]
         if not candidates:
             return None
@@ -477,12 +471,9 @@ class ValueCase:
         lines.append(evidence["headline"])
         lines.append("")
         lines.append(
-            "- Measured facts: %s of modeled value"
-            % fmt_pct(evidence["share_fact"])
+            "- Measured facts: %s of modeled value" % fmt_pct(evidence["share_fact"])
         )
-        lines.append(
-            "- Derived inferences: %s" % fmt_pct(evidence["share_inference"])
-        )
+        lines.append("- Derived inferences: %s" % fmt_pct(evidence["share_inference"]))
         lines.append(
             "- Unmeasured assumptions: %s" % fmt_pct(evidence["share_assumption"])
         )
@@ -709,9 +700,8 @@ def _margin_of_safety(summary: Mapping[str, Any]) -> str:
         return "benefits can come in %s below plan and still break even" % fmt_pct(
             1 - multiplier
         )
-    return (
-        "none — benefits must exceed plan by %s just to break even"
-        % fmt_pct(multiplier - 1)
+    return "none — benefits must exceed plan by %s just to break even" % fmt_pct(
+        multiplier - 1
     )
 
 
@@ -786,9 +776,7 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
     )
 
 
-def _build_driver(
-    raw: Any, index: int, horizon: int, seen_ids: set
-) -> Driver:
+def _build_driver(raw: Any, index: int, horizon: int, seen_ids: set) -> Driver:
     where = "drivers[%d]" % index
     if not isinstance(raw, Mapping):
         raise SpecError("%s must be an object" % where)
@@ -858,8 +846,7 @@ def _build_driver(
             "driver %r has realization %r; it must be greater than 0 and at "
             "most 1. Realization is the haircut between modeled and captured "
             "value — 1.0 claims you capture every modeled dollar, which is a "
-            "position you should be prepared to defend."
-            % (driver_id, realization)
+            "position you should be prepared to defend." % (driver_id, realization)
         )
 
     # Sanity-check the formula evaluates at base before anyone builds on it.
@@ -927,7 +914,7 @@ def load_spec(path: str) -> ValueCase:
     except FileNotFoundError:
         raise SpecError("no such spec file: %s" % path)
     except json.JSONDecodeError as exc:
-        raise SpecError("%s is not valid JSON: %s" % (path, exc))
+        raise SpecError("%s is not valid JSON: %s" % (path, exc)) from exc
     return validate_spec(raw)
 
 

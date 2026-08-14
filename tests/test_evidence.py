@@ -137,8 +137,13 @@ class TestRangeRules(unittest.TestCase):
         with self.assertRaises(EvidenceError):
             validate_input(
                 "r",
-                make(confidence="assumption", low=10, high=1, value=5,
-                     source="Bounded by the two observed extremes in FY25"),
+                make(
+                    confidence="assumption",
+                    low=10,
+                    high=1,
+                    value=5,
+                    source="Bounded by the two observed extremes in FY25",
+                ),
             )
 
     def test_rejects_base_outside_its_own_range(self):
@@ -181,9 +186,7 @@ class TestGrading(unittest.TestCase):
 
     def test_weights_by_magnitude_not_count(self):
         """One large assumption must outweigh several trivial facts."""
-        result = grade_evidence(
-            [("fact", 1), ("fact", 1), ("assumption", 1000)]
-        )
+        result = grade_evidence([("fact", 1), ("fact", 1), ("assumption", 1000)])
         self.assertEqual(result["grade"], "F")
 
     def test_uses_absolute_value_so_negatives_do_not_cancel(self):

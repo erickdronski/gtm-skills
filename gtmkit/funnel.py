@@ -25,9 +25,9 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from .fmt import fmt_currency, fmt_count, fmt_pct, table
+from .fmt import fmt_count, fmt_currency, fmt_pct, table
 
-__all__ = ["FunnelError", "Stage", "plan", "main"]
+__all__ = ["FunnelError", "Stage", "main", "plan"]
 
 
 class FunnelError(ValueError):
@@ -45,9 +45,7 @@ class Stage:
 def parse_stage(text: str) -> Stage:
     """Parse a ``name:rate`` stage definition."""
     if ":" not in text:
-        raise FunnelError(
-            "stage %r must look like 'name:rate', e.g. 'mql:0.25'" % text
-        )
+        raise FunnelError("stage %r must look like 'name:rate', e.g. 'mql:0.25'" % text)
     name, _, raw_rate = text.partition(":")
     name = name.strip()
     if not name:
@@ -55,9 +53,7 @@ def parse_stage(text: str) -> Stage:
     try:
         rate = float(raw_rate)
     except ValueError:
-        raise FunnelError(
-            "stage %r has a non-numeric rate %r" % (text, raw_rate)
-        )
+        raise FunnelError("stage %r has a non-numeric rate %r" % (text, raw_rate))
     if not (0 < rate <= 1):
         raise FunnelError(
             "stage %r has rate %r; conversion rates are decimals above 0 and "
@@ -175,8 +171,7 @@ def plan(
         "ltv_cac_note": (
             "CAC of %s against an ACV of %s is a payback of %s of first-year "
             "contract value. Compare against gross margin before calling this "
-            "efficient."
-            % (fmt_currency(cac), fmt_currency(acv), fmt_pct(cac / acv))
+            "efficient." % (fmt_currency(cac), fmt_currency(acv), fmt_pct(cac / acv))
             if cac
             else None
         ),
@@ -244,9 +239,7 @@ def to_markdown(result: Dict[str, Any], currency: str = "USD") -> str:
                 fmt_currency(result["cost_per_unit"], currency, precise=True),
             )
         )
-        lines.append(
-            "- Blended CAC: **%s**" % fmt_currency(result["cac"], currency)
-        )
+        lines.append("- Blended CAC: **%s**" % fmt_currency(result["cac"], currency))
         if result["ltv_cac_note"]:
             lines.append("- %s" % result["ltv_cac_note"])
         lines.append("")
@@ -288,7 +281,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ),
     )
     parser.add_argument("--target-revenue", type=float, required=True)
-    parser.add_argument("--acv", type=float, required=True, help="average contract value")
+    parser.add_argument(
+        "--acv", type=float, required=True, help="average contract value"
+    )
     parser.add_argument(
         "--stage",
         action="append",

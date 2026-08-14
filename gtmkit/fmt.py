@@ -12,16 +12,16 @@ rendering it to the cent is a lie told in typography.
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 __all__ = [
+    "bar",
+    "fmt_count",
     "fmt_currency",
+    "fmt_multiple",
     "fmt_pct",
     "fmt_periods",
-    "fmt_multiple",
-    "fmt_count",
     "table",
-    "bar",
 ]
 
 _SYMBOLS = {
@@ -45,7 +45,9 @@ def fmt_currency(
     """
     if amount is None:
         return "n/a"
-    symbol = _SYMBOLS.get((currency or "USD").upper(), (currency or "USD").upper() + " ")
+    symbol = _SYMBOLS.get(
+        (currency or "USD").upper(), (currency or "USD").upper() + " "
+    )
     sign = "-" if amount < 0 else ""
     value = abs(float(amount))
 
@@ -91,9 +93,7 @@ def fmt_pct(fraction: Optional[float], decimals: Optional[int] = None) -> str:
         # Rounding 0.0004% to "0%" turns a real number into a wrong one, so
         # widen precision until something survives.
         while (
-            value != 0
-            and decimals < 6
-            and abs(round(value, decimals)) < 10 ** -decimals
+            value != 0 and decimals < 6 and abs(round(value, decimals)) < 10**-decimals
         ):
             decimals += 1
     text = "{:,.{d}f}".format(value, d=decimals)
@@ -122,7 +122,7 @@ def fmt_periods(periods: Optional[float], unit: str = "year") -> str:
         )
 
     whole = int(periods)
-    months = int(round((periods - whole) * 12))
+    months = round((periods - whole) * 12)
     if months == 12:
         whole += 1
         months = 0
@@ -201,5 +201,5 @@ def _cell(value: Any) -> str:
 def bar(fraction: float, width: int = 20, filled: str = "█", empty: str = "░") -> str:
     """A text bar for terminal output, clamped to [0, 1]."""
     fraction = max(0.0, min(1.0, float(fraction)))
-    count = int(round(fraction * width))
+    count = round(fraction * width)
     return filled * count + empty * (width - count)
