@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: tests (python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Confirm there are no dependencies to install
+        run: |
+          test ! -f requirements.txt || (echo "gtm-skills must stay dependency-free" && exit 1)
+      - name: Run the test suite
+        run: python -m unittest discover -s tests -t . -v
+
+  lint-skills:
+    name: lint skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate every skill
+        run: python tools/validate_skills.py
+
+  examples:
+    name: shipped examples still run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Business case
+        run: python -m gtmkit.valuecase examples/value-case/northwind-support-deflection.json --check
+      - name: ICP scoring
+        run: python -m gtmkit.scoring --rubric examples/icp/rubric.json --records examples/icp/accounts.csv
+      - name: MEDDPICC rubric is valid
+        run: |
+          python -m gtmkit.scoring \
+            --rubric skills/deal-qualification/assets/meddpicc-rubric.json \
+            --records examples/pipeline/pipeline.csv --name-field opportunity
+      - name: Market sizing
+        run: python -m gtmkit.sizing --spec examples/sizing/agent-observability-na.json
+      - name: Pricing
+        run: python -m gtmkit.pricing --responses examples/pricing/responses.csv
+      - name: Funnel
+        run: |
+          python -m gtmkit.funnel --target-revenue 4000000 --acv 45000 \
+            --stage "visit:0.08" --stage "mql:0.25" --stage "opp:0.28" \
+            --cpm 22 --audience-ceiling 40000000

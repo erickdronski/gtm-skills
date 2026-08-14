@@ -1,0 +1,15 @@
+{
+  "name": "gtm-skills",
+  "description": "Go-to-market skills for AI agents: business cases, ICP scoring, pricing, market sizing, campaign planning, positioning, competitive briefs, deal qualification, and executive communication — with a tested arithmetic engine and an assumption ledger that rejects unfalsifiable sources.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Erick Dronski",
+    "url": "https://github.com/erickdronski"
+  },
+  "homepage": "https://github.com/erickdronski/gtm-skills",
+  "license": "MIT",
+  "keywords": [
+    "go-to-market", "sales", "marketing", "business-case", "roi",
+    "pricing", "icp", "meddpicc", "positioning", "agent-skills"
+  ]
+}

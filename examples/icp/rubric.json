@@ -1,0 +1,29 @@
+{
+  "name": "ICP fit — mid-market logistics and distribution",
+  "scale": 5,
+  "tiers": [
+    {"min": 0.8, "label": "A"},
+    {"min": 0.62, "label": "B"},
+    {"min": 0.45, "label": "C"},
+    {"min": 0.0, "label": "D"}
+  ],
+  "disqualifiers": [
+    {"field": "employees", "op": "<", "value": 50,
+     "reason": "Below 50 employees the support ticket volume never reaches the threshold where deflection pays back implementation"},
+    {"field": "region", "op": "not in", "value": ["na", "emea"],
+     "reason": "No data residency coverage outside NA and EMEA until Q2 2027"}
+  ],
+  "criteria": [
+    {"id": "employees", "label": "Headcount", "weight": 3, "type": "numeric",
+     "bands": [{"min": 1000, "score": 5}, {"min": 400, "score": 4}, {"min": 150, "score": 3}, {"min": 50, "score": 1}]},
+    {"id": "support_tickets_monthly", "label": "Monthly ticket volume", "weight": 4, "type": "numeric",
+     "bands": [{"min": 8000, "score": 5}, {"min": 3000, "score": 4}, {"min": 1000, "score": 2}, {"min": 0, "score": 1}],
+     "note": "Weighted highest because it is the direct driver of every benefit in our value case"},
+    {"id": "helpdesk", "label": "Helpdesk platform", "weight": 2, "type": "categorical",
+     "map": {"zendesk": 5, "salesforce": 4, "intercom": 3, "freshdesk": 3, "homegrown": 1}, "default": 1},
+    {"id": "industry", "label": "Industry", "weight": 2, "type": "categorical",
+     "map": {"logistics": 5, "distribution": 5, "manufacturing": 3, "retail": 3}, "default": 1},
+    {"id": "exec_sponsor_identified", "label": "Named exec sponsor", "weight": 3, "type": "boolean",
+     "true_score": 5, "false_score": 1}
+  ]
+}

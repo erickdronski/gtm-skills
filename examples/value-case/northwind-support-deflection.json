@@ -1,0 +1,156 @@
+{
+  "name": "Support deflection and agent productivity — Northwind Logistics",
+  "currency": "USD",
+  "horizon_years": 3,
+  "discount_rate_annual": 0.12,
+  "meta": {
+    "prepared_for": "VP Customer Operations, Northwind Logistics",
+    "prepared_by": "Solutions Consulting",
+    "decision_date": "2026-09-30",
+    "status": "draft — pending measurement of deflection_rate"
+  },
+  "drivers": [
+    {
+      "id": "deflection",
+      "label": "Tickets deflected to self-service",
+      "formula": "tickets_per_year * deflection_rate * cost_per_ticket",
+      "inputs": {
+        "tickets_per_year": {
+          "value": 124800,
+          "unit": "tickets",
+          "confidence": "fact",
+          "source": "Zendesk ticket export, 2025-01-01 to 2025-12-31, shared by Dana Whitfield on 2026-07-14"
+        },
+        "deflection_rate": {
+          "value": 0.18,
+          "confidence": "assumption",
+          "source": "Three reference customers with comparable ticket mix reported 14%, 19%, and 24% in their first full year; midpoint taken and rounded down",
+          "low": 0.1,
+          "high": 0.24
+        },
+        "cost_per_ticket": {
+          "value": 12.81,
+          "unit": "USD",
+          "confidence": "inference",
+          "source": "Fully loaded agent cost of $82,000 per year divided by 6,400 tickets handled per agent-year (26 per day across 246 working days), both from the Q2 2026 CX operating review"
+        }
+      },
+      "ramp": [
+        0.4,
+        0.9,
+        1.0
+      ],
+      "realization": 0.85,
+      "note": "Ramp reflects the content build-out schedule: the knowledge base covers roughly 40% of ticket categories at go-live."
+    },
+    {
+      "id": "handle_time",
+      "label": "Reduced handle time on retained tickets",
+      "formula": "tickets_per_year * (1 - deflection_rate) * minutes_saved / 60 * loaded_hourly_cost",
+      "inputs": {
+        "tickets_per_year": {
+          "value": 124800,
+          "unit": "tickets",
+          "confidence": "fact",
+          "source": "Zendesk ticket export, 2025-01-01 to 2025-12-31, shared by Dana Whitfield on 2026-07-14"
+        },
+        "deflection_rate": {
+          "value": 0.18,
+          "confidence": "assumption",
+          "source": "Same deflection assumption as the driver above; retained volume is the complement",
+          "low": 0.1,
+          "high": 0.24
+        },
+        "minutes_saved": {
+          "value": 1.8,
+          "unit": "minutes per ticket",
+          "confidence": "assumption",
+          "source": "Time-and-motion sample of 40 tickets run by the CX ops team in June 2026 showed 1.4 to 2.6 minutes saved on suggested-reply acceptance",
+          "low": 0.8,
+          "high": 2.6
+        },
+        "loaded_hourly_cost": {
+          "value": 39.42,
+          "unit": "USD per hour",
+          "confidence": "inference",
+          "source": "Fully loaded agent cost of $82,000 divided by 2,080 working hours per year"
+        }
+      },
+      "ramp": [
+        0.5,
+        1.0,
+        1.0
+      ],
+      "realization": 0.7,
+      "note": "Realization is haircut hard: time saved per ticket only converts to cash if it aggregates into headcount or absorbed growth, and Northwind has committed to absorbing growth rather than reducing headcount."
+    },
+    {
+      "id": "attrition",
+      "label": "Reduced agent attrition and backfill cost",
+      "formula": "agents * attrition_reduction * cost_per_backfill",
+      "inputs": {
+        "agents": {
+          "value": 20,
+          "unit": "agents",
+          "confidence": "fact",
+          "source": "Workday headcount report for the CX org, dated 2026-07-01 (20 front-line agents, excluding 3 team leads)"
+        },
+        "attrition_reduction": {
+          "value": 0.04,
+          "confidence": "assumption",
+          "source": "Northwind's exit interviews name repetitive ticket volume as the top driver in 31% of CX departures; a 4 point reduction assumes roughly one in eight of those departures is avoided",
+          "low": 0.0,
+          "high": 0.08
+        },
+        "cost_per_backfill": {
+          "value": 18500,
+          "unit": "USD",
+          "confidence": "inference",
+          "source": "Recruiting cost of $6,200 plus 11 weeks to full productivity at the loaded agent rate, per the 2026 CX onboarding model"
+        }
+      },
+      "ramp": [
+        0.0,
+        0.6,
+        1.0
+      ],
+      "realization": 0.6,
+      "note": "Deliberately the weakest driver in the case. It is included because the customer raised it, and bounded at zero on the low side so a skeptical reader can zero it out without rebuilding the model."
+    }
+  ],
+  "costs": [
+    {
+      "id": "subscription",
+      "label": "Platform subscription",
+      "schedule": [
+        0,
+        96000,
+        98880,
+        101846
+      ],
+      "note": "Platform fee plus 20 agent seats; year 1 list less the 12% multi-year discount, 3% uplift thereafter per the draft order form."
+    },
+    {
+      "id": "implementation",
+      "label": "Implementation, integration, and content migration",
+      "schedule": [
+        145000,
+        0,
+        0,
+        0
+      ],
+      "note": "Fixed-fee statement of work: 9 weeks, includes Zendesk and Salesforce integration."
+    },
+    {
+      "id": "internal_effort",
+      "label": "Northwind internal effort",
+      "schedule": [
+        72000,
+        30000,
+        18000,
+        18000
+      ],
+      "note": "Content authoring and program management at loaded internal rates. Included because omitting customer-side effort is the single fastest way to lose a business case in procurement review."
+    }
+  ]
+}

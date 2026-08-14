@@ -1,0 +1,8 @@
+name,employees,support_tickets_monthly,helpdesk,industry,region,exec_sponsor_identified
+Northwind Logistics,1200,10400,zendesk,logistics,na,true
+Kestrel Distribution,640,4200,salesforce,distribution,na,true
+Halden Freight,320,,zendesk,logistics,emea,
+Boreal Retail Group,2400,9100,homegrown,retail,na,false
+Tinsley Manufacturing,180,900,freshdesk,manufacturing,emea,false
+Marisol Shipping,45,600,zendesk,logistics,na,true
+Pacific Rim Cargo,900,7200,zendesk,logistics,apac,true

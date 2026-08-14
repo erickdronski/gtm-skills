@@ -1,0 +1,142 @@
+{
+  "name": "MEDDPICC qualification",
+  "scale": 4,
+  "min_coverage": 0.75,
+  "tiers": [
+    {
+      "min": 0.8,
+      "label": "COMMIT"
+    },
+    {
+      "min": 0.6,
+      "label": "BEST CASE"
+    },
+    {
+      "min": 0.35,
+      "label": "PIPELINE"
+    },
+    {
+      "min": 0.0,
+      "label": "AT RISK"
+    }
+  ],
+  "disqualifiers": [
+    {
+      "field": "identified_pain",
+      "op": "==",
+      "value": "none",
+      "reason": "No identified pain means no reason to act on any timeline; this is not an opportunity yet"
+    }
+  ],
+  "criteria": [
+    {
+      "id": "metrics",
+      "label": "Metrics",
+      "weight": 3,
+      "type": "categorical",
+      "map": {
+        "customer_stated": 4,
+        "jointly_built": 3,
+        "seller_proposed": 1,
+        "none": 0
+      },
+      "default": 0,
+      "note": "Scores what the metric IS, not whether one exists. A metric the seller invented does not survive the buyer's internal review, so it scores barely above nothing."
+    },
+    {
+      "id": "economic_buyer",
+      "label": "Economic buyer",
+      "weight": 4,
+      "type": "categorical",
+      "map": {
+        "met_and_engaged": 4,
+        "met_once": 3,
+        "identified_not_met": 1,
+        "unidentified": 0
+      },
+      "default": 0,
+      "note": "Weighted highest. Knowing who the economic buyer is scores 1, not 3 \u2014 identification without access is the most over-credited state in pipeline review."
+    },
+    {
+      "id": "decision_criteria",
+      "label": "Decision criteria",
+      "weight": 3,
+      "type": "categorical",
+      "map": {
+        "written_from_customer": 4,
+        "verbal_from_customer": 3,
+        "inferred": 1,
+        "not_established": 0
+      },
+      "default": 0,
+      "note": "Criteria you inferred may be criteria a competitor wrote."
+    },
+    {
+      "id": "decision_process",
+      "label": "Decision process",
+      "weight": 3,
+      "type": "categorical",
+      "map": {
+        "mapped_with_dates": 4,
+        "mapped_no_dates": 2,
+        "partial": 1,
+        "not_established": 0
+      },
+      "default": 0
+    },
+    {
+      "id": "paper_process",
+      "label": "Paper process",
+      "weight": 3,
+      "type": "categorical",
+      "map": {
+        "confirmed_timeline": 4,
+        "estimated_timeline": 2,
+        "not_started": 0
+      },
+      "default": 0,
+      "note": "Six weeks of security review discovered in the last week of the quarter is the most common single-cause slip in enterprise software."
+    },
+    {
+      "id": "identified_pain",
+      "label": "Identified pain",
+      "weight": 4,
+      "type": "categorical",
+      "map": {
+        "urgent_with_deadline": 4,
+        "urgent_no_deadline": 2,
+        "acknowledged": 1,
+        "none": 0
+      },
+      "default": 0,
+      "note": "Pain without a deadline loses to every competing priority. Its most common competitor is not a rival vendor, it is 'next year'."
+    },
+    {
+      "id": "champion",
+      "label": "Champion",
+      "weight": 4,
+      "type": "categorical",
+      "map": {
+        "tested_and_selling": 4,
+        "willing_untested": 2,
+        "coach_only": 1,
+        "none": 0
+      },
+      "default": 0,
+      "note": "Tested means they have done something costly for you: taken a meeting to their boss, shared internal information, put their name on something. Someone friendly on calls is a coach."
+    },
+    {
+      "id": "competition",
+      "label": "Competition",
+      "weight": 2,
+      "type": "categorical",
+      "map": {
+        "known_from_buyer": 4,
+        "known_inferred": 2,
+        "not_established": 0
+      },
+      "default": 0,
+      "note": "Remember that 'do nothing' is usually the leading competitor."
+    }
+  ]
+}

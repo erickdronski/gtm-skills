@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "gtm-skills",
+  "description": "Go-to-market skills for AI agents, built on a tested arithmetic engine",
+  "owner": {
+    "name": "Erick Dronski",
+    "url": "https://github.com/erickdronski"
+  },
+  "plugins": [
+    {
+      "name": "gtm-skills",
+      "description": "Business cases, ICP scoring, pricing, market sizing, campaign planning, positioning, competitive briefs, deal qualification, and exec comms — where the numbers come from tested code rather than from the model.",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/erickdronski/gtm-skills"
+    }
+  ]
+}
