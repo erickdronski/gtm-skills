@@ -1,0 +1,31 @@
+# Cut a release from a version tag.
+#
+#   git tag v0.1.0 && git push --tags
+#
+# gtm-skills installs as a Claude Code plugin straight from this repository, so
+# there is no registry to publish to. The tag exists so users can pin a known
+# version, and the job re-verifies the pack before the tag is trusted.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -t .
+      - run: python tools/validate_skills.py
+      - name: Plugin manifests must parse
+        run: |
+          python -c "import json; json.load(open('.claude-plugin/plugin.json'))"
+          python -c "import json; json.load(open('.claude-plugin/marketplace.json'))"
