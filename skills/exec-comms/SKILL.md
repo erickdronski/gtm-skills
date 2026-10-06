@@ -104,6 +104,31 @@ Consistency period-over-period matters more than completeness in any single
 update. A board that can compare this quarter to last quarter without
 re-learning your format gets far more out of it.
 
+### Pipeline and forecast slides
+
+Board updates and internal QBRs almost always carry a pipeline slide, and it is
+the slide most often built from arithmetic done by hand on stage probabilities
+nobody sourced. Compute it instead:
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.pipeline pipeline.csv \
+  --stages stages.json --target 1200000 --closed 95000 \
+  --period-end 2026-12-31 --as-of 2026-10-06
+```
+
+Then write it the way this skill writes everything else. Lead with the expected
+landing against target, and the commit number. Put coverage next to the
+coverage the stage probabilities need — a bare "2.2x" invites the reader to
+compare it with a rule of thumb that does not fit your stage mix. Carry the
+spread with the forecast ("$1.0M expected, ±$330k"), because a lone forecast
+figure is precision outrunning the estimate. If the engine graded the
+probabilities D or F, or ran on its placeholder model, say so on the slide: it
+is the limit a board member would otherwise find for you. Use the same stage
+model every period, for the same reason you keep the same metrics.
+
+The file format and the stage model are in
+[the pipeline format reference](../deal-qualification/references/pipeline-format.md).
+
 ### Customer QBR
 
 The mistake is making it a status report. A QBR is a business review with the

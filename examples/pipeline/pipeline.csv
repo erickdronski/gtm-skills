@@ -1,6 +1,19 @@
-opportunity,metrics,economic_buyer,decision_criteria,decision_process,paper_process,identified_pain,champion,competition
-Northwind renewal,customer_stated,met_and_engaged,written_from_customer,mapped_with_dates,confirmed_timeline,urgent_with_deadline,tested_and_selling,known_from_buyer
-Kestrel expansion,jointly_built,met_once,verbal_from_customer,mapped_no_dates,estimated_timeline,urgent_no_deadline,willing_untested,known_inferred
-Boreal new logo,seller_proposed,identified_not_met,inferred,partial,not_started,acknowledged,coach_only,not_established
-Tinsley pilot,none,unidentified,unknown,unknown,not_started,none,none,not_established
-Halden eval,jointly_built,met_once,,,,urgent_no_deadline,,
+opportunity,owner,amount,stage,close_date,original_close_date,last_activity,forecast_category,metrics,economic_buyer,decision_criteria,decision_process,paper_process,identified_pain,champion,competition
+Northwind renewal,Priya Shah,240000,negotiation,2026-10-30,2026-10-30,2026-10-02,commit,customer_stated,met_and_engaged,written_from_customer,mapped_with_dates,confirmed_timeline,urgent_with_deadline,tested_and_selling,known_from_buyer
+Kestrel expansion,Marcus Bell,186000,proposal,2026-11-20,2026-10-31,2026-09-29,best_case,jointly_built,identified_not_met,verbal_from_customer,mapped_no_dates,,urgent_with_deadline,willing_untested,known_inferred
+Boreal new logo,Elena Ortiz,310000,solution,2026-12-15,2026-11-30,2026-08-28,pipeline,seller_proposed,identified_not_met,inferred,partial,not_started,acknowledged,coach_only,not_established
+Tinsley pilot,Sam Whitfield,48000,discovery,2026-12-18,2026-12-18,2026-09-30,pipeline,none,unidentified,unknown,unknown,not_started,none,none,not_established
+Halden eval,Marcus Bell,132000,qualification,2026-12-11,2026-12-11,2026-10-01,pipeline,jointly_built,met_once,,,,urgent_no_deadline,,
+Ostrava Parcel platform,Elena Ortiz,96000,proposal,2026-09-26,2026-09-12,2026-09-03,commit,customer_stated,met_once,verbal_from_customer,mapped_no_dates,estimated_timeline,urgent_with_deadline,willing_untested,known_from_buyer
+Corvid Freight,Sam Whitfield,72000,negotiation,2026-10-23,2026-10-23,2026-10-05,commit,customer_stated,met_and_engaged,written_from_customer,mapped_with_dates,estimated_timeline,urgent_with_deadline,tested_and_selling,known_from_buyer
+Larkspur Logistics,Priya Shah,420000,proposal,2026-12-18,2026-12-18,2026-10-01,best_case,jointly_built,met_once,written_from_customer,mapped_with_dates,estimated_timeline,urgent_with_deadline,tested_and_selling,known_from_buyer
+Wexford Supply,Elena Ortiz,64000,closing,2026-10-16,2026-10-16,2026-10-05,commit,customer_stated,met_and_engaged,written_from_customer,mapped_with_dates,confirmed_timeline,urgent_with_deadline,tested_and_selling,known_from_buyer
+Juniper Wholesale,Marcus Bell,155000,solution,2026-12-04,2026-11-13,2026-09-02,best_case,jointly_built,identified_not_met,verbal_from_customer,partial,not_started,urgent_no_deadline,willing_untested,known_inferred
+Tamarind Home,Sam Whitfield,88000,solution,2026-11-27,2026-11-27,2026-09-24,pipeline,seller_proposed,met_once,inferred,partial,,acknowledged,coach_only,known_inferred
+Quillon Supply,Priya Shah,205000,qualification,2026-12-22,2026-12-22,2026-09-30,pipeline,jointly_built,identified_not_met,,,,urgent_no_deadline,willing_untested,
+Aster Medical Supply,Elena Ortiz,260000,discovery,2027-01-29,2027-01-29,2026-10-02,pipeline,,,,,,acknowledged,,
+Brightwater Foods,Marcus Bell,118000,proposal,2026-11-13,2026-11-13,2026-10-05,best_case,customer_stated,met_once,written_from_customer,mapped_no_dates,estimated_timeline,urgent_with_deadline,tested_and_selling,known_inferred
+Calloway Auto Parts,Sam Whitfield,54000,qualification,2026-12-30,2026-12-30,2026-08-14,pipeline,seller_proposed,unidentified,,,,acknowledged,coach_only,
+Fennick Outdoor,Priya Shah,140000,discovery,2026-12-31,2026-12-31,2026-09-28,pipeline,,,,,,urgent_no_deadline,,
+Grisham Office,Elena Ortiz,76000,solution,2026-09-30,2026-09-30,2026-09-18,best_case,jointly_built,met_once,verbal_from_customer,mapped_no_dates,not_started,urgent_with_deadline,willing_untested,known_inferred
+Norland Pharma Distribution,Marcus Bell,340000,qualification,2027-02-26,2027-02-26,2026-09-21,pipeline,jointly_built,identified_not_met,,,,urgent_no_deadline,,

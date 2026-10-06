@@ -1,0 +1,72 @@
+{
+  "name": "Stage-to-close, FY2026 history",
+  "currency": "USD",
+  "stages": [
+    {
+      "id": "discovery",
+      "label": "Discovery",
+      "category": "pipeline",
+      "probability": {
+        "value": 0.08,
+        "confidence": "fact",
+        "source": "Salesforce report 'Stage entry to close', FY2026 (2025-10-01 to 2026-09-30): 31 of 388 opportunities that entered Discovery closed-won"
+      }
+    },
+    {
+      "id": "qualification",
+      "label": "Qualification",
+      "category": "pipeline",
+      "probability": {
+        "value": 0.17,
+        "confidence": "fact",
+        "source": "Same FY2026 stage-entry report: 29 of 171 opportunities that entered Qualification closed-won"
+      }
+    },
+    {
+      "id": "solution",
+      "label": "Solution",
+      "category": "pipeline",
+      "probability": {
+        "value": 0.31,
+        "confidence": "fact",
+        "source": "Same FY2026 stage-entry report: 27 of 87 opportunities that entered Solution closed-won"
+      }
+    },
+    {
+      "id": "proposal",
+      "label": "Proposal",
+      "category": "best_case",
+      "probability": {
+        "value": 0.45,
+        "confidence": "inference",
+        "source": "Same report: 24 of 50 Proposal entries won (48%). Five of those wins came from the one-off Q4 FY2026 pricing promotion; without them it is 19 of 45 (42%). Set between the two.",
+        "low": 0.42,
+        "high": 0.48
+      }
+    },
+    {
+      "id": "negotiation",
+      "label": "Negotiation",
+      "category": "best_case",
+      "probability": {
+        "value": 0.7,
+        "confidence": "assumption",
+        "source": "Only 19 opportunities reached Negotiation in FY2026 (14 won, 74%), too few to pin a rate; bounded by the 55-85% seen across FY2024 to FY2026",
+        "low": 0.55,
+        "high": 0.85
+      }
+    },
+    {
+      "id": "closing",
+      "label": "Closing",
+      "category": "commit",
+      "probability": {
+        "value": 0.88,
+        "confidence": "assumption",
+        "source": "9 of 10 Closing-stage deals won in FY2026, one lost to a procurement freeze; ten deals cannot pin a rate, so it is bounded at 75-95%",
+        "low": 0.75,
+        "high": 0.95
+      }
+    }
+  ]
+}

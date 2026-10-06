@@ -20,6 +20,22 @@ and the plan either closes or visibly does not — before anyone spends money.
 The target is whatever revenue or pipeline number marketing is accountable for.
 Take it as given; the point of this exercise is not to negotiate it.
 
+**Subtract what is already in flight.** If deals are already open against the
+same period, the campaign is accountable for the gap they will not close, not
+the whole number. Run the open pipeline through the engine first:
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.pipeline pipeline.csv \
+  --stages stages.json --target 4000000 --closed 650000 \
+  --period-end 2026-12-31 --as-of 2026-10-06
+```
+
+The shortfall at the expected landing becomes the funnel's `--target-revenue`,
+and the shortfall at the low end of the landing range is the stress case in
+step 4. The stage probabilities need sources just like the conversion rates
+below, and the engine refuses a CRM default declared as a fact. The format is
+in [the pipeline format reference](../deal-qualification/references/pipeline-format.md).
+
 Conversion rates are where plans go wrong, and there are only three honest
 sources for them, in descending order of trustworthiness:
 
@@ -119,7 +135,8 @@ a plan that penciled at the portfolio level misses in execution.
 
 A campaign plan that will survive review contains:
 
-1. The target, and the deal count it implies.
+1. The target net of what open pipeline is expected to close, and the deal
+   count it implies.
 2. Required volume at each stage, with the source of every conversion rate.
 3. Spend, blended CAC, and CAC as a share of first-year ACV.
 4. The audience ceiling and the headroom against it.

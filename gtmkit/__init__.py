@@ -31,6 +31,9 @@ Modules:
     MEDDPICC for one deal, with each answer's provenance kept apart from its
     score: confirmed versus stated versus assumed, stage-aware failure
     patterns, and the next thing to confirm.
+``pipeline``
+    Coverage against a target, a weighted forecast whose stage probabilities
+    carry their sources, the commit view, hygiene flags, and concentration.
 ``fmt``
     Executive-readable number and table formatting.
 
@@ -47,6 +50,7 @@ __all__ = [
     "finance",
     "fmt",
     "funnel",
+    "pipeline",
     "pricing",
     "qualify",
     "scoring",

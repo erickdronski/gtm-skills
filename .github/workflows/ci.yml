@@ -61,6 +61,11 @@ jobs:
             --records examples/pipeline/pipeline.csv --name-field opportunity
       - name: Deal qualification
         run: python -m gtmkit.qualify examples/deal/kestrel-expansion.json
+      - name: Pipeline
+        run: |
+          python -m gtmkit.pipeline examples/pipeline/pipeline.csv \
+            --stages examples/pipeline/stages.json --target 1200000 \
+            --closed 95000 --period-end 2026-12-31 --as-of 2026-10-06
       - name: Market sizing
         run: python -m gtmkit.sizing --spec examples/sizing/agent-observability-na.json
       - name: Pricing

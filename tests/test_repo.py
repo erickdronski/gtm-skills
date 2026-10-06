@@ -16,7 +16,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gtmkit import pricing, scoring, sizing, valuecase
+from gtmkit import pipeline, pricing, qualify, scoring, sizing, valuecase
 from tools import validate_skills
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -176,6 +176,42 @@ class TestShippedExamplesStillRun(unittest.TestCase):
         )
         results = scoring.score_all(rubric, records)
         self.assertTrue(any(r["tier"] == "COMMIT" for r in results))
+
+    def test_deal_example_is_its_pipeline_row_with_provenance(self):
+        """examples/deal/ is the Kestrel row of examples/pipeline/, plus how
+        each answer is known. Edit one without the other and the two examples
+        quietly tell different stories about the same deal."""
+        with open(
+            os.path.join(EXAMPLES, "deal", "kestrel-expansion.json"), encoding="utf-8"
+        ) as handle:
+            result = qualify.qualify(json.load(handle))
+        row = next(
+            r
+            for r in scoring.load_records(
+                os.path.join(EXAMPLES, "pipeline", "pipeline.csv")
+            )
+            if r["opportunity"] == "Kestrel expansion"
+        )
+        for element in result["elements"]:
+            with self.subTest(element=element["id"]):
+                self.assertEqual(row[element["id"]] or None, element["level"])
+        self.assertEqual(float(row["amount"]), result["amount"])
+        self.assertEqual(row["close_date"], result["close_date"])
+        self.assertEqual(row["stage"], result["stage"])
+
+    def test_pipeline_example(self):
+        with open(
+            os.path.join(EXAMPLES, "pipeline", "stages.json"), encoding="utf-8"
+        ) as handle:
+            model = pipeline.load_stage_model(json.load(handle))
+        result = pipeline.analyze(
+            scoring.load_records(os.path.join(EXAMPLES, "pipeline", "pipeline.csv")),
+            model,
+            target=1200000,
+            closed=95000,
+        )
+        self.assertEqual(result["excluded_rows"], [])
+        self.assertEqual(result["ignored_values"], [])
 
     def test_sizing_example(self):
         with open(

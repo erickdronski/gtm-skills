@@ -1,6 +1,6 @@
 ---
 name: deal-qualification
-description: Qualify an opportunity against MEDDPICC or a similar framework, plan discovery calls, and score deal health with explicit coverage of what is known versus assumed. Use this whenever the user asks to qualify a deal, run MEDDPICC or MEDDIC, prep for a discovery call, assess whether a deal is real, review a pipeline, decide what to forecast, write discovery questions, or figure out why a deal stalled. Also use it when someone describes an opportunity in optimistic terms and the underlying qualification has not been checked.
+description: Qualify an opportunity against MEDDPICC or a similar framework, plan discovery calls, and review a pipeline — scoring deal health with explicit coverage of what is confirmed versus assumed, and computing coverage and a weighted forecast from sourced stage probabilities. Use this whenever the user asks to qualify a deal, run MEDDPICC or MEDDIC, prep for a discovery call, assess whether a deal is real, review a pipeline, check pipeline coverage, build a weighted forecast or commit call, find stale or slipped deals, decide what to forecast, write discovery questions, or figure out why a deal stalled. Also use it when someone describes an opportunity in optimistic terms and the underlying qualification has not been checked.
 ---
 
 # Deal qualification
@@ -174,16 +174,54 @@ four, discovery worked.
 
 ## Pipeline review
 
-Reviewing a set of deals, look for the patterns rather than deal-by-deal detail:
+A pipeline review asks two questions, and they need different tools.
+
+**How much is there, and what will it produce?** That is arithmetic, so it
+comes from the engine:
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.pipeline pipeline.csv \
+  --stages stages.json --target 1200000 --closed 95000 \
+  --period-end 2026-12-31 --as-of 2026-10-06
+```
+
+It reports coverage of what is left of the target next to the coverage the
+stage probabilities actually require, the weighted forecast with its range and
+standard deviation, the commit / best case / pipeline build against target,
+concentration in the largest deals, and every deal whose close date has passed,
+been pushed, or gone untouched. The file format, flags, and stage model are in
+[the pipeline format reference](references/pipeline-format.md).
+
+The stage probabilities are the whole forecast, so get them from the user's own
+history — of the deals that *entered* each stage last year, the share that
+closed-won — and record the report they came from. If all they have is the
+CRM's default percentages, those go in as assumptions with ranges; the engine
+refuses a default declared as a fact, and with no stage model it runs on
+labelled placeholders and calls the result a scenario. Never type in "typical"
+stage probabilities yourself: that is the invented-benchmark failure this pack
+exists to stop, wearing a forecast's clothes.
+
+Lead with the expected landing against target and the commit number. Report
+coverage only next to the coverage the probabilities need — "2.2x" sounds
+healthy until the reader learns this stage mix needs 2.6x.
+
+**Which of it is real?** That is qualification. Run the scoring pass over the
+same file, then a full `gtmkit.qualify` spec on the large deals someone is
+calling commit or best case. Where the rep's category and the qualification
+tier disagree — a commit that scores best case, a best case that scores commit
+— is where the review should spend its time. Then look for the patterns rather
+than deal-by-deal detail:
 
 **Deals with no confirmed economic buyer past the halfway point.** These are the
-most common source of slip.
+most common source of slip; `gtmkit.qualify` flags them from Solution on.
 
 **Deals where the metric is the rep's, not the customer's.** Check whose words
 the metric is in.
 
-**Deals with a close date that never moves.** A close date held constant across
-three reviews while nothing else advanced is a date nobody has retested.
+**Deals with a close date that never moves.** The engine flags dates that have
+passed or been pushed. A date held constant across three reviews while nothing
+else advanced needs review history it does not have, so ask: it is a date
+nobody has retested.
 
 **Deals with no paper-process timeline.** Ask for the security review estimate.
 Silence here is a quarter-end problem forming.
@@ -219,5 +257,11 @@ shifts. Quiet neglect produces neither.
   each one.
 - `references/deal-spec.md` — the deal spec, the status rules, the failure
   patterns, and how the next action is ranked.
+- `references/pipeline-format.md` — the pipeline file, the stage model, every
+  flag, and what the forecast arithmetic assumes.
 - `references/discovery-questions.md` — a question bank organized by element,
   with notes on what a good answer versus a deflection sounds like.
+
+Worked examples live in `examples/deal/` and `examples/pipeline/`. The deal
+spec is the pipeline's Kestrel row with its provenance recorded, so the two
+show the believed view and the evidenced view of the same deal.
