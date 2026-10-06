@@ -20,6 +20,35 @@
       "label": "AT RISK"
     }
   ],
+  "stages": [
+    {
+      "id": "discovery",
+      "label": "Discovery"
+    },
+    {
+      "id": "qualification",
+      "label": "Qualification"
+    },
+    {
+      "id": "solution",
+      "label": "Solution"
+    },
+    {
+      "id": "proposal",
+      "label": "Proposal"
+    },
+    {
+      "id": "negotiation",
+      "label": "Negotiation"
+    },
+    {
+      "id": "closing",
+      "label": "Closing"
+    }
+  ],
+  "stages_note": "Map a CRM's stages onto these six by what has to be true to enter each, not by name. Solution: the buyer is evaluating a specific solution. Proposal: pricing is in front of them. Closing: contract and paperwork are in motion.",
+  "paper_lead_days": 42,
+  "paper_lead_days_note": "Six weeks, the security-review-plus-contracting span the paper-process note warns about. Inside this many days of the close date, an unknown paper process is flagged whatever the stage. Replace it with how long your last few deals actually spent between verbal yes and signature.",
   "disqualifiers": [
     {
       "field": "identified_pain",
@@ -41,6 +70,8 @@
         "none": 0
       },
       "default": 0,
+      "confirm_by": "solution",
+      "action": "Get the champion to state the metric, its current baseline, and its target in their own words, in writing.",
       "note": "Scores what the metric IS, not whether one exists. A metric the seller invented does not survive the buyer's internal review, so it scores barely above nothing."
     },
     {
@@ -55,7 +86,9 @@
         "unidentified": 0
       },
       "default": 0,
-      "note": "Weighted highest. Knowing who the economic buyer is scores 1, not 3 \u2014 identification without access is the most over-credited state in pipeline review."
+      "confirm_by": "solution",
+      "action": "Meet the economic buyer. Ask the champion who signs at this amount and to bring them into the next conversation; whether they will is itself a test of the champion.",
+      "note": "Weighted highest. Knowing who the economic buyer is scores 1, not 3 — identification without access is the most over-credited state in pipeline review."
     },
     {
       "id": "decision_criteria",
@@ -69,6 +102,8 @@
         "not_established": 0
       },
       "default": 0,
+      "confirm_by": "solution",
+      "action": "Get the decision criteria in writing, in the buyer's words, and ask which one would decide a tie.",
       "note": "Criteria you inferred may be criteria a competitor wrote."
     },
     {
@@ -82,7 +117,9 @@
         "partial": 1,
         "not_established": 0
       },
-      "default": 0
+      "default": 0,
+      "confirm_by": "proposal",
+      "action": "Walk the approval chain with the buyer: every gate (legal, security, procurement, finance), who owns it, and the date it clears. Ask what happened to the last project like this that did not get approved."
     },
     {
       "id": "paper_process",
@@ -95,6 +132,8 @@
         "not_started": 0
       },
       "default": 0,
+      "confirm_by": "proposal",
+      "action": "Ask which vendor they onboarded most recently and how long security review, legal, and procurement took end to end; then get this deal's paperwork started in parallel.",
       "note": "Six weeks of security review discovered in the last week of the quarter is the most common single-cause slip in enterprise software."
     },
     {
@@ -109,6 +148,8 @@
         "none": 0
       },
       "default": 0,
+      "confirm_by": "qualification",
+      "action": "Ask what happens if nothing changes for another year, and whose deadline the pain is attached to.",
       "note": "Pain without a deadline loses to every competing priority. Its most common competitor is not a rival vendor, it is 'next year'."
     },
     {
@@ -123,6 +164,8 @@
         "none": 0
       },
       "default": 0,
+      "confirm_by": "solution",
+      "action": "Test the champion with something costly: ask them to arrange the economic-buyer meeting, share the internal business case, or put their name on the recommendation.",
       "note": "Tested means they have done something costly for you: taken a meeting to their boss, shared internal information, put their name on something. Someone friendly on calls is a coach."
     },
     {
@@ -136,6 +179,8 @@
         "not_established": 0
       },
       "default": 0,
+      "confirm_by": "solution",
+      "action": "Ask what they will do if they do nothing, and which alternatives are furthest along.",
       "note": "Remember that 'do nothing' is usually the leading competitor."
     }
   ]

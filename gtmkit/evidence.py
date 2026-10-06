@@ -37,6 +37,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 __all__ = [
     "CONFIDENCE_LEVELS",
+    "MIN_SOURCE_CHARS",
     "EvidenceError",
     "Input",
     "grade_evidence",
@@ -74,8 +75,10 @@ _WEASEL_PATTERNS = (
 
 _WEASEL_RE = tuple(re.compile(p, re.IGNORECASE) for p in _WEASEL_PATTERNS)
 
-#: A source this short cannot identify anything a reader could go open.
-_MIN_SOURCE_CHARS = 12
+#: A source this short cannot identify anything a reader could go open. Public
+#: because the deal-qualification ledger holds a "confirmed" source to the same
+#: floor, and two copies of a threshold drift apart.
+MIN_SOURCE_CHARS = 12
 
 
 def weasel_phrases(source: str) -> List[str]:
@@ -191,7 +194,7 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
             "For an assumption, state the rationale. For an inference, state "
             "the derivation." % name
         )
-    if len(source) < _MIN_SOURCE_CHARS:
+    if len(source) < MIN_SOURCE_CHARS:
         raise EvidenceError(
             "source for %r is too vague to verify: %r. Name something a "
             "reader could actually open or reproduce." % (name, source)

@@ -59,6 +59,8 @@ jobs:
           python -m gtmkit.scoring \
             --rubric skills/deal-qualification/assets/meddpicc-rubric.json \
             --records examples/pipeline/pipeline.csv --name-field opportunity
+      - name: Deal qualification
+        run: python -m gtmkit.qualify examples/deal/kestrel-expansion.json
       - name: Market sizing
         run: python -m gtmkit.sizing --spec examples/sizing/agent-observability-na.json
       - name: Pricing

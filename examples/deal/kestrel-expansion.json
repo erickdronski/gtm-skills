@@ -1,0 +1,53 @@
+{
+  "name": "Kestrel Distribution — support platform expansion",
+  "owner": "Marcus Bell",
+  "amount": 186000,
+  "currency": "USD",
+  "stage": "proposal",
+  "close_date": "2026-11-20",
+  "as_of": "2026-10-06",
+  "elements": {
+    "metrics": {
+      "level": "jointly_built",
+      "status": "confirmed",
+      "source": "Dana Ruiz email of 2026-09-14 restating the target from the 2026-09-12 discovery call: 30% deflection against a $410k annual tier-1 cost baseline",
+      "notes": "Built together on the call; the baseline is Kestrel's own Zendesk cost report, so it will survive their finance review."
+    },
+    "economic_buyer": {
+      "level": "identified_not_met",
+      "status": "stated",
+      "by": "Dana Ruiz, VP Customer Support",
+      "notes": "Dana says CFO Tom Akers approves anything over $150k. Nobody on our side has met him, and we have not seen the approval policy."
+    },
+    "decision_criteria": {
+      "level": "verbal_from_customer",
+      "status": "confirmed",
+      "source": "Criteria walked through by Dana Ruiz and IT lead Sam Osei on the 2026-09-26 evaluation call (Gong recording)"
+    },
+    "decision_process": {
+      "level": "mapped_no_dates",
+      "status": "assumed",
+      "basis": "Rep's read from the original 2025 purchase: IT review, then CFO sign-off. Nobody at Kestrel has walked us through this year's steps."
+    },
+    "paper_process": {
+      "status": "unknown",
+      "notes": "Nobody has asked how long their vendor security review runs."
+    },
+    "identified_pain": {
+      "level": "urgent_with_deadline",
+      "status": "confirmed",
+      "source": "Dana Ruiz email 2026-09-14: peak-season backlog must be under 48 hours before the 2027-01-15 renewal of their largest shipper contract"
+    },
+    "champion": {
+      "level": "willing_untested",
+      "status": "stated",
+      "by": "Dana Ruiz, VP Customer Support",
+      "notes": "Says she will take the proposal to the CFO. Has not yet shared internal material or arranged a meeting upward."
+    },
+    "competition": {
+      "level": "known_inferred",
+      "status": "assumed",
+      "basis": "They run Zendesk, so the Zendesk AI add-on is the obvious alternative. The buyer has not said what else they are looking at."
+    }
+  }
+}

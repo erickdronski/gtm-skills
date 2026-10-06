@@ -11,14 +11,15 @@ and it slips three quarters running. The fields were filled with what the rep
 *believes* rather than what anyone *confirmed*, and nothing in the process
 distinguishes the two.
 
-So the discipline here is not the framework. It is separating three states for
-every element:
+So the discipline here is not the framework. It is recording, for every
+element, *how anyone knows*:
 
-| State | Means |
-|-------|-------|
-| **Confirmed** | Someone in the account said it, or you saw the artifact |
-| **Assumed** | The rep believes it, plausibly, without confirmation |
-| **Unknown** | Nobody has asked |
+| Status | Means | Requires |
+|--------|-------|----------|
+| **Confirmed** | Checked against something a reviewer could open — the dated call, the email, the document | The source |
+| **Stated** | A named person in the account said it, and nothing corroborates it yet | Who said it |
+| **Assumed** | The rep believes it, plausibly, without anyone in the account saying so | Nothing, but it is labelled |
+| **Unknown** | Nobody has asked | No level at all |
 
 Most stalled deals are stalled on something that was "assumed" and was wrong.
 Making that visible is the entire value of doing this properly.
@@ -65,11 +66,74 @@ gate.
 *Test:* Do you know what the alternative actually is, from the buyer rather than
 from inference?
 
-## Running it as a score
+## Scoring one deal
 
-The qualification rubric is the same weighted-scoring engine used for ICP fit,
-which means elements you have not confirmed reduce *coverage* rather than
-silently scoring as zero:
+Write the deal as a spec — for each element, a level from the rubric and a
+status — and let the engine do the arithmetic:
+
+```bash
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.qualify deal.json
+```
+
+`--as-of YYYY-MM-DD` pins the date the close-date checks run against (default:
+the spec's `as_of`, then today, which the output prints); `--format json`
+returns the full result. An element looks like this:
+
+```json
+"economic_buyer": {
+  "level": "identified_not_met",
+  "status": "stated",
+  "by": "Dana Ruiz, VP Customer Support"
+}
+```
+
+The format, every element's levels, and the rule each status must meet are in
+`references/deal-spec.md`. A worked spec is `examples/deal/kestrel-expansion.json`.
+
+**Fill it by asking how they know, not what they think.** For each element,
+get the answer and then its provenance. If the user can name the call (with
+its date), the email, or the document, it is confirmed and that goes in
+`source`. If someone told them, it is stated and the person goes in `by`.
+Otherwise it is assumed. Never write a plausible source to get a confirmation
+past the validator: it rejects "multiple conversations" for the same reason the
+value case rejects "industry standard", and inventing a specific-sounding one
+just moves the fiction from the spec into the forecast.
+
+### Reading the output
+
+The score uses the same rubric and arithmetic as the ICP scorer, so the two
+engines never disagree about a tier. What comes back on top of it:
+
+- **The verdict** puts the tier on what the team believes next to the tier at
+  the *floor* — every element that is not confirmed at its worst level at
+  once. "BEST CASE on belief, AT RISK at the floor" is the sentence a forecast
+  call needs and almost never gets. Unknown elements lower coverage, not the
+  score; under 75% coverage a deal is UNKNOWN — not weak, unexamined.
+- **The evidence mix** is the share of rubric weight that is confirmed,
+  stated, assumed, and unknown. Status deliberately does not discount the
+  score: a penalty for "assumed" would be a number nobody measured, and the
+  gap is more useful shown than blended.
+- **Failure patterns** — no access to the economic buyer, champion untested,
+  decision process assumed, paper process unknown late, no customer-owned
+  metric, competition unknown. Each fires only once the deal reaches the stage
+  by which its element should be confirmed: an unknown paper process is normal
+  in discovery and a quarter-end slip forming at proposal. The paper process
+  also fires within six weeks of the close date whatever the stage. Each
+  pattern states its mechanism and what would make it wrong.
+- **The next action** is the one element whose answer is most likely to move
+  the call: one that could change the tier first, then one a pattern is firing
+  on, then the latest, then the least known. It comes with the reason and the
+  tier at its worst and best outcome.
+
+Lead the review with the next action. "Meet the CFO before the 20th, because
+that decides whether this is best case or pipeline" is a review outcome. A
+score is not.
+
+### Many deals at once
+
+A CRM export records levels but not how anyone knows them, so the most it
+supports is the believed view. The same rubric runs across it on the scoring
+engine, which holds under-answered deals out of the ranking:
 
 ```bash
 PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.scoring \
@@ -78,8 +142,8 @@ PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.scoring \
 ```
 
 A deal at 80% qualification on 45% coverage is not a strong deal. It is an
-unexamined one, and the engine holds it out of the ranking and tells you exactly
-which elements are missing. That missing list is the call plan.
+unexamined one. Use this pass to pick the deals worth a full `gtmkit.qualify`
+spec — the large ones someone is calling commit or best case.
 
 ## Planning the discovery call
 
@@ -138,6 +202,11 @@ Disqualify when: there is no metric anyone owns, no access to economic buying
 authority after genuine attempts, no deadline attached to the pain, or a
 structural blocker you cannot clear.
 
+The engine makes the bluntest version of this call itself: a deal with no
+identified pain at all is tiered OUT, and its next action is to disqualify — or,
+if that "none" was only assumed, to confirm it first. The rest are judgment
+calls the failure patterns inform but do not make.
+
 Do it explicitly, and tell the buyer why. "Based on what you have described, I
 do not think this is the right time — here is what would change that" preserves
 the relationship and frequently produces a re-engagement when the situation
@@ -145,8 +214,10 @@ shifts. Quiet neglect produces neither.
 
 ## Reference material
 
-- `assets/meddpicc-rubric.json` — a ready-to-run qualification rubric for the
-  scoring engine, with coverage thresholds tuned so that unconfirmed elements
-  correctly hold a deal out of the ranking.
+- `assets/meddpicc-rubric.json` — the rubric both engines read: levels and
+  weights, the stages, when each element is due, and the action that resolves
+  each one.
+- `references/deal-spec.md` — the deal spec, the status rules, the failure
+  patterns, and how the next action is ranked.
 - `references/discovery-questions.md` — a question bank organized by element,
   with notes on what a good answer versus a deflection sounds like.

@@ -27,6 +27,10 @@ Modules:
     Van Westendorp price sensitivity and value-metric analysis.
 ``scoring``
     Weighted rubric scoring for ICP fit, deal qualification, and account health.
+``qualify``
+    MEDDPICC for one deal, with each answer's provenance kept apart from its
+    score: confirmed versus stated versus assumed, stage-aware failure
+    patterns, and the next thing to confirm.
 ``fmt``
     Executive-readable number and table formatting.
 
@@ -44,6 +48,7 @@ __all__ = [
     "fmt",
     "funnel",
     "pricing",
+    "qualify",
     "scoring",
     "sizing",
     "valuecase",
