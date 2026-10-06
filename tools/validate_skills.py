@@ -15,7 +15,10 @@ Checks, in rough order of how often they catch something real:
   whether a skill ever triggers, so it is checked rather than assumed.
 * Every relative link and referenced file actually exists. A skill that points
   at a missing reference wastes an agent's turn discovering that.
-* Every ``python3 -m gtmkit.<module>`` invocation names a module that exists.
+* Every ``gtmkit.<module>`` mention names a module that exists, and every
+  ``python3 -m gtmkit.<module>`` command — in SKILL.md and in references/ —
+  invokes a runnable module with flags its CLI actually accepts. A documented
+  flag that argparse rejects costs the agent a failed run and a guess.
 * SKILL.md stays under the length where it stops being loaded usefully.
 * No unresolved placeholders (``TODO``, ``TBD``, ``XXX``, ``FIXME``, ``...``)
   left in shipped text.
@@ -29,10 +32,11 @@ from __future__ import annotations
 import os
 import re
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILLS_DIR = os.path.join(REPO_ROOT, "skills")
+GTMKIT_DIR = os.path.join(REPO_ROOT, "gtmkit")
 
 MAX_SKILL_LINES = 500
 MIN_DESCRIPTION_CHARS = 120
@@ -48,6 +52,80 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 BACKTICK_PATH_RE = re.compile(r"`(references/[^`]+|assets/[^`]+|examples/[^`]+)`")
 GTMKIT_RE = re.compile(r"gtmkit\.([a-z_]+)")
+
+# A command and everything after it on the same logical line. Shell line
+# continuations are joined before matching, so a multi-line invocation in a
+# fenced block is checked as the one command it is.
+COMMAND_RE = re.compile(r"python3?\s+-m\s+gtmkit\.([a-z_]+)([^\n]*)")
+CONTINUATION_RE = re.compile(r"\\\n\s*")
+FLAG_RE = re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]*)")
+ADD_ARGUMENT_RE = re.compile(r"add_argument\(\s*((?:\"[^\"]*\"\s*,\s*)*\"[^\"]*\")")
+QUOTED_RE = re.compile(r"\"([^\"]*)\"")
+
+
+def module_flags(module: str) -> Optional[Set[str]]:
+    """Return the option strings a gtmkit module's CLI declares.
+
+    Read from source rather than by importing, so the linter cannot execute
+    anything and does not depend on the engine importing cleanly. Every CLI in
+    the package declares options as ``add_argument("--name", ...)``, which this
+    matches; ``--help`` comes free with argparse.
+    """
+    path = os.path.join(GTMKIT_DIR, "%s.py" % module)
+    if not os.path.isfile(path):
+        return None
+    with open(path, "r", encoding="utf-8") as handle:
+        source = handle.read()
+    flags = {"--help", "-h"}
+    for match in ADD_ARGUMENT_RE.finditer(source):
+        for name in QUOTED_RE.findall(match.group(1)):
+            if name.startswith("-"):
+                flags.add(name)
+    return flags
+
+
+def module_is_runnable(module: str) -> bool:
+    path = os.path.join(GTMKIT_DIR, "%s.py" % module)
+    if not os.path.isfile(path):
+        return False
+    with open(path, "r", encoding="utf-8") as handle:
+        source = handle.read()
+    return "def main(" in source and '__name__ == "__main__"' in source
+
+
+def command_problems(text: str) -> List[str]:
+    """Check every ``python3 -m gtmkit.<module>`` command in a document.
+
+    Only flags on the command's own logical line are checked. A flag merely
+    mentioned in prose has no command to belong to, and guessing one would
+    produce false alarms that teach people to ignore the linter.
+    """
+    problems: List[str] = []
+    joined = CONTINUATION_RE.sub(" ", text)
+    for match in COMMAND_RE.finditer(joined):
+        module = match.group(1)
+        flags = module_flags(module)
+        if flags is None:
+            # Reported once by the module-existence check; a second error for
+            # the same typo is noise.
+            continue
+        if not module_is_runnable(module):
+            problems.append(
+                "runs `python3 -m gtmkit.%s`, but that module has no main() "
+                "entry point" % module
+            )
+            continue
+        # Strip a trailing shell comment so prose like "# --format json is
+        # also available" is not read as part of the command.
+        arguments = re.split(r"\s#", match.group(2), maxsplit=1)[0]
+        for flag in FLAG_RE.findall(arguments):
+            if flag not in flags:
+                accepted = ", ".join(sorted(f for f in flags if f.startswith("--")))
+                problems.append(
+                    "shows `gtmkit.%s %s`, which the CLI does not accept. "
+                    "It takes: %s" % (module, flag, accepted)
+                )
+    return problems
 
 
 class Findings:
@@ -195,9 +273,11 @@ def check_skill(directory: str, findings: Findings) -> None:
     # -- gtmkit module references ----------------------------------------
     for match in GTMKIT_RE.finditer(text):
         module = match.group(1)
-        module_path = os.path.join(REPO_ROOT, "gtmkit", "%s.py" % module)
+        module_path = os.path.join(GTMKIT_DIR, "%s.py" % module)
         if not os.path.isfile(module_path):
             findings.error(name, "invokes gtmkit.%s, which does not exist" % module)
+    for problem in command_problems(text):
+        findings.error(name, "SKILL.md %s" % problem)
 
     # -- reference files get a light check of their own -------------------
     references_dir = os.path.join(directory, "references")
@@ -222,6 +302,16 @@ def check_skill(directory: str, findings: Findings) -> None:
                         "references/%s contains an unresolved placeholder: %s"
                         % (entry, placeholder),
                     )
+            for match in GTMKIT_RE.finditer(body):
+                module = match.group(1)
+                if not os.path.isfile(os.path.join(GTMKIT_DIR, "%s.py" % module)):
+                    findings.error(
+                        name,
+                        "references/%s invokes gtmkit.%s, which does not exist"
+                        % (entry, module),
+                    )
+            for problem in command_problems(body):
+                findings.error(name, "references/%s %s" % (entry, problem))
 
 
 def main() -> int:

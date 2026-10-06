@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -59,6 +60,83 @@ class TestSkillLinter(unittest.TestCase):
             "---\nname: mismatched\ndescription: short\n---\nbody\n"
         )[0]
         self.assertEqual(broken["name"], "mismatched")
+
+
+class TestEngineCommandsInDocs(unittest.TestCase):
+    """A documented command must be one the engine will actually run.
+
+    The module-existence check alone let a skill show a flag argparse rejects,
+    which costs an agent a failed run and then a guess at what was meant.
+    """
+
+    DESCRIPTION = (
+        "Exercise the linter. Use this whenever a test needs a skill that is "
+        "otherwise valid so that exactly one defect is under test."
+    )
+
+    def lint(self, body, reference=None):
+        with tempfile.TemporaryDirectory() as root:
+            directory = os.path.join(root, "probe")
+            os.makedirs(os.path.join(directory, "references"))
+            with open(
+                os.path.join(directory, "SKILL.md"), "w", encoding="utf-8"
+            ) as handle:
+                handle.write(
+                    "---\nname: probe\ndescription: %s\n---\n\n%s\n"
+                    % (self.DESCRIPTION, body)
+                )
+            if reference is not None:
+                path = os.path.join(directory, "references", "usage.md")
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write(reference)
+            findings = validate_skills.Findings()
+            validate_skills.check_skill(directory, findings)
+            return findings.errors
+
+    def test_a_valid_multiline_command_passes(self):
+        errors = self.lint(
+            "```bash\npython3 -m gtmkit.scoring \\\n  --rubric r.json \\\n"
+            "  --records a.csv --format json\n```"
+        )
+        self.assertEqual(errors, [])
+
+    def test_unknown_flag_is_an_error(self):
+        errors = self.lint("```bash\npython3 -m gtmkit.scoring --rubrik r.json\n```")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("--rubrik", errors[0])
+        self.assertIn("--rubric", errors[0], "the error should list the real flags")
+
+    def test_unknown_module_is_an_error(self):
+        errors = self.lint("```bash\npython3 -m gtmkit.forecastr --x 1\n```")
+        self.assertTrue(any("gtmkit.forecastr" in e for e in errors))
+
+    def test_module_without_a_cli_is_an_error(self):
+        errors = self.lint("```bash\npython3 -m gtmkit.fmt\n```")
+        self.assertTrue(any("no main()" in e for e in errors))
+
+    def test_reference_files_are_checked_too(self):
+        errors = self.lint(
+            "See `references/usage.md`.",
+            reference="```bash\npython3 -m gtmkit.funnel --target 5\n```\n",
+        )
+        self.assertEqual(len(errors), 1)
+        self.assertIn("references/usage.md", errors[0])
+
+    def test_trailing_shell_comment_is_not_part_of_the_command(self):
+        errors = self.lint(
+            "```bash\npython3 -m gtmkit.sizing --spec m.json  # --anything\n```"
+        )
+        self.assertEqual(errors, [])
+
+    def test_flags_are_read_from_the_cli_definition(self):
+        flags = validate_skills.module_flags("scoring")
+        self.assertTrue({"--rubric", "--records", "--name-field"} <= flags)
+        self.assertIsNone(validate_skills.module_flags("no_such_module"))
+
+    def test_readme_commands_use_real_flags(self):
+        with open(os.path.join(REPO_ROOT, "README.md"), encoding="utf-8") as handle:
+            readme = handle.read()
+        self.assertEqual(validate_skills.command_problems(readme), [])
 
 
 class TestShippedExamplesStillRun(unittest.TestCase):
