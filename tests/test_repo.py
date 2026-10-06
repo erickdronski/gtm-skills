@@ -310,6 +310,25 @@ class TestReadmeStaysHonest(unittest.TestCase):
                 )
                 self.assertIn(quoted, self.readme)
 
+    def test_quoted_qualification_verdict_matches_the_example(self):
+        """Every line of the README's verdict excerpt must still be generated."""
+        with open(
+            os.path.join(EXAMPLES, "deal", "kestrel-expansion.json"), encoding="utf-8"
+        ) as handle:
+            markdown = qualify.to_markdown(qualify.qualify(json.load(handle)))
+        start = self.readme.index("## Verdict:")
+        excerpt = self.readme[start : self.readme.index("```", start)]
+        lines = [line for line in excerpt.splitlines() if line.strip()]
+        self.assertGreaterEqual(len(lines), 3)
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertIn(
+                    line,
+                    markdown,
+                    "README quotes %r but the deal example no longer produces it"
+                    % line,
+                )
+
     def test_every_skill_is_listed(self):
         for directory in skill_dirs():
             name = os.path.basename(directory)

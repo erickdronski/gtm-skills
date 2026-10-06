@@ -42,7 +42,7 @@ Every CLI is invoked the same way::
     python3 -m gtmkit.<module> --help
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "evidence",

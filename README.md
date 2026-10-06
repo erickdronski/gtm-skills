@@ -17,7 +17,7 @@
   <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-174ea6">
   <img alt="Linux macOS Windows" src="https://img.shields.io/badge/tested_on-Linux%20%7C%20macOS%20%7C%20Windows-0f766e">
   <img alt="ruff" src="https://img.shields.io/badge/lint-ruff-d97706">
-  <img alt="205 tests" src="https://img.shields.io/badge/tests-205-6b21a8">
+  <img alt="326 tests" src="https://img.shields.io/badge/tests-326-6b21a8">
 </p>
 
 ---
@@ -129,13 +129,13 @@ disguise.
 |-------|-------------|
 | [`value-case`](skills/value-case/SKILL.md) | Business cases with sensitivity analysis, a floor case, and an evidence grade |
 | [`icp-scoring`](skills/icp-scoring/SKILL.md) | ICP definition and account scoring that reports data coverage alongside fit |
-| [`campaign-plan`](skills/campaign-plan/SKILL.md) | Inverse funnel math — work backwards from the target to required spend and volume |
+| [`campaign-plan`](skills/campaign-plan/SKILL.md) | Inverse funnel math — work backwards from the target, net of open pipeline, to required spend and volume |
 | [`market-sizing`](skills/market-sizing/SKILL.md) | TAM/SAM/SOM with bottom-up and top-down reconciled against each other |
 | [`pricing-strategy`](skills/pricing-strategy/SKILL.md) | Value metric, packaging, and Van Westendorp price sensitivity |
 | [`positioning`](skills/positioning/SKILL.md) | Positioning and messaging hierarchy grounded in competitive alternatives |
 | [`competitive-brief`](skills/competitive-brief/SKILL.md) | Battlecards a rep can survive a real objection with — including honest weaknesses |
-| [`deal-qualification`](skills/deal-qualification/SKILL.md) | MEDDPICC scoring that separates confirmed from assumed |
-| [`exec-comms`](skills/exec-comms/SKILL.md) | Board updates, QBRs, and decision memos that lead with the decision |
+| [`deal-qualification`](skills/deal-qualification/SKILL.md) | MEDDPICC scoring that separates confirmed from assumed, and pipeline coverage and forecasts from sourced stage probabilities |
+| [`exec-comms`](skills/exec-comms/SKILL.md) | Board updates, QBRs, and decision memos that lead with the decision, with pipeline slides computed rather than typed |
 
 Each is a full methodology, not a prompt template — with the failure modes
 called out, because knowing how the analysis breaks is most of the value.
@@ -161,6 +161,22 @@ under-researched records out of the ranking entirely:
 Halden scores 83% and is still held back. Ranking it above a fully-diligenced
 peer would be comparing a measurement to a guess.
 
+Deal qualification applies the same idea one level down. A CRM field records
+what the rep believes; the deal engine also records how anyone knows it —
+confirmed against a dated call or document, stated by a named person, assumed,
+or never asked — and reports the two side by side:
+
+```
+## Verdict: BEST CASE on belief, AT RISK at the floor
+
+Scores 61% across 88% of the rubric — BEST CASE on what the team believes.
+38% of the rubric's weight is confirmed; 31% rests on someone's word, 19% on
+the rep's assumption and 12% has not been asked.
+```
+
+The floor is every unconfirmed answer at its worst at once. The section after
+the verdict names the one element whose answer would move the call, and why.
+
 **Say the weak part first.** Every generated document names its own limitations
 before the reader finds them — the evidence grade sits above the driver detail,
 the floor case is reported next to the headline, and the rejected survey
@@ -179,6 +195,8 @@ python3 -m gtmkit.scoring --rubric r.json --records accounts.csv
 python3 -m gtmkit.funnel --target-revenue 4000000 --acv 45000 --stage "mql:0.25"
 python3 -m gtmkit.sizing --spec market.json    # bottom-up vs top-down
 python3 -m gtmkit.pricing --responses survey.csv
+python3 -m gtmkit.qualify deal.json            # MEDDPICC, confirmed vs assumed
+python3 -m gtmkit.pipeline pipeline.csv --stages stages.json --target 1200000
 ```
 
 Add `--format json` to any of them to build your own view on top.
@@ -200,19 +218,27 @@ Some things it does that a spreadsheet version generally does not:
 - **Formulas are evaluated by a whitelist AST walker, never `eval`.** These
   specs are routinely assembled from data an agent read out of an email or a
   PDF. That is untrusted input, and it is treated as such.
+- **A "confirmed" MEDDPICC answer needs a source a reviewer could open** — a
+  dated call, an email, a document. "Multiple conversations" is rejected the
+  way "industry standard" is, and "she told me" is recorded as stated, with
+  her name.
+- **Pipeline coverage is reported next to the coverage your own stage
+  probabilities require**, and the weighted forecast next to its standard
+  deviation. Each stage probability is a ledger entry; a CRM picklist default
+  declared as a measured fact is refused.
 
 ## Testing
 
 ```bash
-python3 -m unittest discover -s tests -t .   # 205 tests
+python3 -m unittest discover -s tests -t .   # 326 tests
 python3 tools/validate_skills.py             # lint every skill
 ```
 
 The finance tests check against hand-computed closed-form values rather than
 snapshots — a snapshot test would have happily locked in the off-by-one
 discounting error those tests exist to prevent. The skill linter checks
-frontmatter, description trigger quality, dead links, referenced modules, and
-length budgets, and runs in CI.
+frontmatter, description trigger quality, dead links, referenced modules and
+the flags their commands use, and length budgets, and runs in CI.
 
 ## Contributing
 

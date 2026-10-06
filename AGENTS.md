@@ -28,7 +28,8 @@ python3 tools/validate_skills.py
 ```
 
 Both must pass. The linter checks skill frontmatter, description trigger
-quality, dead links, referenced `gtmkit` modules, and length budgets.
+quality, dead links, referenced `gtmkit` modules and the flags their commands
+use, and length budgets.
 
 If you change a number that appears in README.md, regenerate it and update the
 README. A README quoting output the code no longer produces is worse than no
