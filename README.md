@@ -1,6 +1,6 @@
 <h1 align="center">gtm-skills</h1>
 
-<p align="center"><strong>Go-to-market skills for AI agents — where the numbers come from tested code, not from the model.</strong></p>
+<p align="center"><strong>Evidence-based go-to-market workflows for AI agents, backed by a tested Python engine.</strong></p>
 
 <p align="center">
   <a href="#install">Install</a> ·
@@ -16,27 +16,24 @@
   <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-0-08775c">
   <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-174ea6">
   <img alt="Linux macOS Windows" src="https://img.shields.io/badge/tested_on-Linux%20%7C%20macOS%20%7C%20Windows-0f766e">
-  <img alt="ruff" src="https://img.shields.io/badge/lint-ruff-d97706">
   <img alt="326 tests" src="https://img.shields.io/badge/tests-326-6b21a8">
+  <a href="https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 ---
 
-Ask an AI agent for a business case and you get a beautiful document built on
-invented numbers. It will tell you "industry research shows a 30% productivity
-gain," and that sentence survives right up until a CFO asks which industry,
-whose research, measured how — at which point the whole document, including the
-true parts, is dead.
+Build business cases, prioritize accounts, assess deals, and plan go-to-market
+investments with calculations a reviewer can inspect. **gtm-skills** combines
+nine agent skills with **gtmkit**, a dependency-free Python library for financial
+modeling, scoring, pricing, market sizing, and pipeline analysis.
 
-This pack fixes that structurally. Nine skills covering the go-to-market
-surface — business cases, ICP scoring, pricing, market sizing, campaign
-planning, positioning, competitive briefs, deal qualification, and executive
-communication — sitting on a **tested Python library** that does the arithmetic
-and an **assumption ledger** that refuses to accept a number without knowing
-where it came from.
+The skills guide the analysis and communication. The engine calculates the
+results. An **assumption ledger** records sources, distinguishes measured facts
+from inferences and assumptions, and requires ranges for uncertain inputs.
 
-Every figure in a generated document traces to a named input with a stated
-source. Nothing is written by hand.
+**Start here:** [run the business-case example](#see-it-work),
+[choose a skill](#the-nine-skills), or [inspect the engine](#the-engine).
+The CLI also works without an AI agent or API key.
 
 ## Install
 
@@ -61,7 +58,7 @@ the entire engine is standard library, offline, and does not phone home.
 
 ## See it work
 
-One command, no setup:
+After cloning the repository, run the included example:
 
 ```bash
 python3 -m gtmkit.valuecase examples/value-case/northwind-support-deflection.json
@@ -89,9 +86,11 @@ This one input moves NPV by $339.9k across its stated range and it flips the
 decision at its low bound.
 ```
 
-That last block is the part no other tool produces. The model grades its own
-evidence, names the single number most worth measuring before the decision, and
-tells you when an assumption is load-bearing enough to flip the answer.
+This is output from the included example, not a reported customer outcome.
+The engine grades the declared evidence, identifies the input most worth
+measuring, and reports whether its uncertainty could change the decision.
+It validates the structure and specificity of source descriptions; a reviewer
+still needs to verify the underlying evidence.
 
 ## The assumption ledger
 
@@ -103,12 +102,10 @@ Every number entering a model declares what kind of number it is:
 | `inference` | Derived from facts by stated reasoning | The derivation itself |
 | `assumption` | Chosen, not measured | A rationale **and** a low/high range |
 
-Assumptions require ranges because an unbounded assumption cannot be
-stress-tested, and a business case whose assumptions cannot be stress-tested is
-a brochure.
+Assumptions require ranges so the engine can test how uncertainty affects
+the result and expose the conditions needed for the case to hold.
 
-And these sources are **rejected at the door**, not flagged in a report nobody
-reads:
+Vague source descriptions are rejected during validation, including:
 
 > `industry standard` · `research shows` · `best practice` · `internal data` ·
 > a bare analyst-firm name · `estimated` · `TBD` · `assumed`
@@ -120,8 +117,7 @@ unfalsifiable claim: 'industry standard'. Replace it with a specific artifact
 really is unmeasured, mark it confidence='assumption' and give it a range.
 ```
 
-The format has no objection to uncertainty. It objects to uncertainty in
-disguise.
+Uncertainty stays visible in both the inputs and the report.
 
 ## The nine skills
 
@@ -137,17 +133,14 @@ disguise.
 | [`deal-qualification`](skills/deal-qualification/SKILL.md) | MEDDPICC scoring that separates confirmed from assumed, and pipeline coverage and forecasts from sourced stage probabilities |
 | [`exec-comms`](skills/exec-comms/SKILL.md) | Board updates, QBRs, and decision memos that lead with the decision, with pipeline slides computed rather than typed |
 
-Each is a full methodology, not a prompt template — with the failure modes
-called out, because knowing how the analysis breaks is most of the value.
+Each skill includes its methodology, supporting references, and common
+failure modes.
 
 ## Two ideas that run through everything
 
-**Unknown is not the same as bad.** Every scoring model quietly treats missing
-data as bad data — an account with no headcount on file scores like an account
-known to be tiny. That single behavior has misdirected more territory plans than
-any modeling error, because it systematically buries the accounts nobody has
-researched yet. So the scorer reports fit *and* coverage, and holds
-under-researched records out of the ranking entirely:
+**Separate fit from evidence coverage.** Missing information should not be
+interpreted as poor fit. The scorer reports both measures and holds
+under-researched records out of the ranking:
 
 ```
 | Record          | Tier    | Fit  | Coverage | Notes                                       |
@@ -177,12 +170,10 @@ the rep's assumption and 12% has not been asked.
 The floor is every unconfirmed answer at its worst at once. The section after
 the verdict names the one element whose answer would move the call, and why.
 
-**Say the weak part first.** Every generated document names its own limitations
-before the reader finds them — the evidence grade sits above the driver detail,
-the floor case is reported next to the headline, and the rejected survey
-responses are listed rather than silently dropped. Volunteering the limit is the
-cheapest credibility available, and it costs almost nothing because a competent
-reader would have asked anyway.
+**Make limitations reviewable.** Evidence grades appear before driver detail,
+floor cases accompany headline results, and pricing reports list rejected
+survey responses. Reviewers can see which inputs need stronger evidence and
+which conclusions depend on assumptions.
 
 ## The engine
 
@@ -201,7 +192,7 @@ python3 -m gtmkit.pipeline pipeline.csv --stages stages.json --target 1200000
 
 Add `--format json` to any of them to build your own view on top.
 
-Some things it does that a spreadsheet version generally does not:
+Implementation details worth reviewing:
 
 - **Period 0 is undiscounted**, per finance convention — which differs from
   Excel's `NPV()`, one of the most common errors in circulated models. Pinned by
@@ -209,9 +200,8 @@ Some things it does that a spreadsheet version generally does not:
 - **IRR returns `None` rather than a diverged number**, and flags cash flow
   shapes where IRR is mathematically ambiguous.
 - **Van Westendorp validates monotonicity per respondent** and reports what it
-  dropped. In real survey data, 5–15% of responses have the four answers out of
-  order — leaving them in is the most common reason two analysts get different
-  answers from the same file.
+  dropped, so invalid responses cannot silently distort the price-sensitivity
+  curves.
 - **Driver value is attributed across inputs by proportional sensitivity**, so
   the evidence grade discriminates between a case with one soft input and a case
   that is soft all the way through.
@@ -230,7 +220,7 @@ Some things it does that a spreadsheet version generally does not:
 ## Testing
 
 ```bash
-python3 -m unittest discover -s tests -t .   # 326 tests
+python3 -m unittest discover -s tests -t .
 python3 tools/validate_skills.py             # lint every skill
 ```
 
