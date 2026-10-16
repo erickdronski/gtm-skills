@@ -227,5 +227,34 @@ class TestWeakestConfidence(unittest.TestCase):
         self.assertEqual(weakest_confidence([]), "assumption")
 
 
+class TestFiniteEvidence(unittest.TestCase):
+    def test_bad_bound_types_raise_a_domain_error_before_comparison(self):
+        for bounds in ({"low": "bad", "high": 200}, {"low": 0, "high": []}):
+            with self.subTest(bounds=bounds), self.assertRaises(EvidenceError):
+                validate_input("acv", make(**bounds))
+
+    def test_values_and_bounds_must_be_finite(self):
+        for field in ("value", "low", "high"):
+            for value in (float("nan"), float("inf"), -float("inf")):
+                with (
+                    self.subTest(field=field, value=value),
+                    self.assertRaisesRegex(EvidenceError, "finite"),
+                ):
+                    validate_input("acv", make(**{field: value}))
+
+    def test_single_bound_must_contain_base(self):
+        for bounds in ({"low": 101}, {"high": 99}):
+            with (
+                self.subTest(bounds=bounds),
+                self.assertRaisesRegex(EvidenceError, "outside"),
+            ):
+                validate_input("acv", make(**bounds))
+
+    def test_invalid_contributions_cannot_produce_an_evidence_grade(self):
+        for value in (float("nan"), float("inf"), -float("inf"), True, "bad"):
+            with self.subTest(value=value), self.assertRaises(EvidenceError):
+                grade_evidence([("fact", value)])
+
+
 if __name__ == "__main__":
     unittest.main()

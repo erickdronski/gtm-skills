@@ -325,5 +325,51 @@ class TestShippedExample(unittest.TestCase):
                 self.assertNotIn("||", line)
 
 
+class TestAdverseBounds(unittest.TestCase):
+    def test_inverse_input_high_bound_can_reverse_the_decision(self):
+        spec = minimal_spec(horizon_years=1, discount_rate_annual=0)
+        spec["drivers"] = [
+            {
+                "id": "inverse",
+                "formula": "1000 * (1 - loss)",
+                "inputs": {
+                    "loss": {
+                        "value": 0.2,
+                        "low": 0.1,
+                        "high": 0.9,
+                        "confidence": "assumption",
+                        "source": "Illustrative planning interval",
+                    }
+                },
+            }
+        ]
+        spec["costs"] = [{"id": "cost", "schedule": [500, 0]}]
+        case = validate_spec(spec)
+        row = case.sensitivity()[0]
+        self.assertAlmostEqual(case.npv_with(), 300)
+        self.assertAlmostEqual(row["npv_low"], 400)
+        self.assertAlmostEqual(row["npv_high"], -400)
+        self.assertAlmostEqual(row["downside"], -700)
+        self.assertAlmostEqual(row["upside"], 100)
+        self.assertTrue(row["flips_decision"])
+        self.assertNotIn(
+            "at its low bound", case.evidence()["largest_assumption"]["advice"]
+        )
+
+    def test_non_finite_schedules_are_rejected_before_calculation(self):
+        for value in (float("nan"), float("inf"), -float("inf")):
+            for field in ("ramp", "cost"):
+                spec = minimal_spec()
+                if field == "ramp":
+                    spec["drivers"][0]["ramp"][0] = value
+                else:
+                    spec["costs"][0]["schedule"][0] = value
+                with (
+                    self.subTest(field=field, value=value),
+                    self.assertRaisesRegex(SpecError, "non-finite"),
+                ):
+                    validate_spec(spec)
+
+
 if __name__ == "__main__":
     unittest.main()

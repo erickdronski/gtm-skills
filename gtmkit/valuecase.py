@@ -50,13 +50,15 @@ Design choices worth knowing about:
 * **Sensitivity is one-at-a-time.** Each ranged input is swung to its low and
   high while everything else holds at base. This produces a tornado, which is
   what reviewers expect, and it deliberately does not compound worst cases —
-  a simultaneous all-inputs-low scenario is reported separately as the floor.
+  a simultaneous adverse-bound scenario is reported separately as the floor.
+  This is a stress test, not a global minimum for interacting inputs.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -289,9 +291,11 @@ class ValueCase:
                         "npv_low": npv_low,
                         "npv_high": npv_high,
                         "swing": abs(npv_high - npv_low),
-                        "downside": npv_low - base,
-                        "upside": npv_high - base,
-                        "flips_decision": (npv_low < 0) != (base < 0),
+                        "downside": min(npv_low, npv_high, base) - base,
+                        "upside": max(npv_low, npv_high, base) - base,
+                        "flips_decision": any(
+                            (value < 0) != (base < 0) for value in (npv_low, npv_high)
+                        ),
                     }
                 )
         rows.sort(key=lambda r: r["swing"], reverse=True)
@@ -301,9 +305,9 @@ class ValueCase:
         """Every ranged input simultaneously at its unfavorable bound.
 
         Reported separately from the tornado because compounding every downside
-        at once is not a forecast — it is a stress test. Presenting it as the
-        "conservative case" overstates pessimism; presenting it as the floor is
-        accurate and much more persuasive when the floor is still positive.
+        at once is not a forecast — it is a stress test. Bounds are selected
+        one at a time against the base, so interactions or non-monotonic
+        formulas can have lower values elsewhere in the declared ranges.
         """
         overrides: Dict[str, Dict[str, float]] = {}
         base = self.npv_with()
@@ -392,7 +396,7 @@ class ValueCase:
                 "decision, it is this one."
                 % (
                     fmt_currency(top["swing"], self.currency),
-                    " and it flips the decision at its low bound"
+                    " and it flips the decision at a stated bound"
                     if top["flips_decision"]
                     else "",
                 )
@@ -600,7 +604,9 @@ class ValueCase:
         lines.append("")
         lines.append(
             "Every ranged input simultaneously at its unfavorable bound. This "
-            "is a stress test, not a forecast."
+            "is a stress test, not a forecast or a guaranteed minimum. Bounds "
+            "are selected one at a time against the base; interactions and "
+            "non-monotonic formulas may produce worse outcomes within the ranges."
         )
         lines.append("")
         lines.append(
@@ -832,6 +838,8 @@ def _build_driver(raw: Any, index: int, horizon: int, seen_ids: set) -> Driver:
     for value in ramp:
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise SpecError("driver %r ramp contains a non-number" % driver_id)
+        if not math.isfinite(value):
+            raise SpecError("driver %r ramp contains a non-finite value" % driver_id)
         if value < 0:
             raise SpecError("driver %r ramp contains a negative value" % driver_id)
     ramp = [float(v) for v in ramp]
@@ -892,6 +900,8 @@ def _build_cost(raw: Any, index: int, horizon: int, seen_ids: set) -> CostLine:
     for value in schedule:
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise SpecError("cost %r schedule contains a non-number" % cost_id)
+        if not math.isfinite(value):
+            raise SpecError("cost %r schedule contains a non-finite value" % cost_id)
         if value < 0:
             raise SpecError(
                 "cost %r has a negative entry. Costs are positive numbers in "

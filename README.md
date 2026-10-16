@@ -83,7 +83,7 @@ largest assumption.
 
 **Measure this first — Tickets deflected to self-service / deflection_rate.**
 This one input moves NPV by $339.9k across its stated range and it flips the
-decision at its low bound.
+decision at a stated bound.
 ```
 
 This is output from the included example, not a reported customer outcome.

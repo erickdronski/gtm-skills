@@ -126,12 +126,14 @@ decision, it is that one. Recommending that measurement is often more valuable
 to the customer than the model itself.
 
 **Whether any input flips the decision.** An input that turns NPV negative at
-its low bound is the real subject of the meeting. Lead with it.
+either bound is the real subject of the meeting. Lead with it.
 
 **The floor case.** Every ranged input at its unfavorable bound simultaneously.
 If the case still clears zero at the floor, that is the strongest sentence
 available to you and it should be in the first paragraph. If it does not, say
-so and name what has to hold.
+so and name what has to hold. Bounds are selected one at a time against the
+base, so interacting or non-monotonic formulas can be worse elsewhere in the
+ranges; this stress scenario is not a guaranteed minimum.
 
 ### 5. Write the narrative around the model
 
