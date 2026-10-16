@@ -3,6 +3,35 @@
 Contributions are welcome — especially new skills, sharper methodology, and
 corrections from people who do this work for a living.
 
+## Make a first contribution
+
+You can contribute business experience, Python, or technical writing. Choose a
+small change you can demonstrate:
+
+| Your experience | A useful first contribution | Start here |
+|---|---|---|
+| Sales, marketing, or value engineering | Show a concrete situation where a skill's advice needs a clearer boundary or a different approach | [Skills](skills/) |
+| Python or financial modeling | Reproduce a calculation disagreement with minimal inputs and a hand-worked expected result | [Finance tests](tests/test_finance.py) and [examples](examples/) |
+| Documentation | Run an example and clarify a step, input, or output explanation that was confusing | [Business-case walkthrough](README.md#see-it-work) |
+
+For a methodology or calculation question, [open an issue](https://github.com/erickdronski/gtm-skills/issues/new)
+with the skill or module, the decision you were trying to make, what happened,
+and a concrete counterexample or expected result. Use fictional or anonymized
+inputs. You do not need to write code to make that report useful.
+
+For a pull request:
+
+1. Check [open issues](https://github.com/erickdronski/gtm-skills/issues) and
+   [pull requests](https://github.com/erickdronski/gtm-skills/pulls) for related work.
+2. Fork the repository, create a branch, and keep the change focused on one
+   problem. The [README example](README.md#see-it-work) is a dependency-free
+   starting point for getting familiar with the engine.
+3. Follow the skill or engine guidance below. For behavior changes, add a test
+   that captures the problem and shows the expected result.
+4. In the pull request, explain the problem, show the before/after behavior or
+   wording, and say what you checked. A screenshot or output excerpt is useful
+   when it makes the change easier to review.
+
 ## The bar
 
 **Anything that produces a number needs a test.** The whole premise of this pack

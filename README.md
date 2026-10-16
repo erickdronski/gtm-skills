@@ -232,10 +232,14 @@ the flags their commands use, and length budgets, and runs in CI.
 
 ## Contributing
 
-New skills and better methodology are both welcome. The bar is in
-[CONTRIBUTING.md](CONTRIBUTING.md); the short version is that anything producing
-a number needs a test, and any claim about how business works should say what
-would make it wrong.
+Work in sales, marketing, or value engineering? A concrete counterexample to a
+skill's advice is a useful contribution, even without code. Python contributors
+can help reproduce calculation questions; documentation contributors can clarify
+an example they have tried.
+
+[Choose a first contribution](CONTRIBUTING.md#make-a-first-contribution).
+The quality bar stays the same: anything producing a number needs a test, and
+claims about how business works should say what would make them wrong.
 
 ## Related
 
