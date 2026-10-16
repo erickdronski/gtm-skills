@@ -209,5 +209,21 @@ class TestSummarize(unittest.TestCase):
             self.assertIn(key, result)
 
 
+class TestFiniteFinance(unittest.TestCase):
+    def test_cash_flows_and_discount_rates_must_be_finite(self):
+        for value in (float("nan"), float("inf"), -float("inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(finance.InvalidCashFlows):
+                    finance.npv(0.1, [-100, value])
+                with self.assertRaises(finance.InvalidCashFlows):
+                    finance.npv(value, [-100, 110])
+                with self.assertRaises(finance.InvalidCashFlows):
+                    finance.present_value(value, 0.1, 1)
+
+    def test_irr_preserves_roots_at_bracket_endpoints(self):
+        self.assertEqual(finance.irr([-100, 100], low=0, high=1), 0)
+        self.assertEqual(finance.irr([-100, 200], low=0, high=1), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -32,6 +32,7 @@ before they fund it, and stating it first is disarming rather than damaging.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -178,6 +179,9 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise EvidenceError("input %r has a non-numeric value %r" % (name, value))
 
+    if not math.isfinite(value):
+        raise EvidenceError("input %r must have a finite value" % name)
+
     confidence = str(raw.get("confidence", "")).strip().lower()
     if confidence not in CONFIDENCE_LEVELS:
         raise EvidenceError(
@@ -210,8 +214,6 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
 
     low = raw.get("low")
     high = raw.get("high")
-    if low is not None and high is not None and low > high:
-        raise EvidenceError("input %r has low (%r) above high (%r)" % (name, low, high))
     for bound_name, bound in (("low", low), ("high", high)):
         if bound is not None and (
             isinstance(bound, bool) or not isinstance(bound, (int, float))
@@ -219,7 +221,11 @@ def validate_input(name: str, raw: Mapping[str, Any]) -> Input:
             raise EvidenceError(
                 "input %r has non-numeric %s %r" % (name, bound_name, bound)
             )
-    if low is not None and high is not None and not (low <= value <= high):
+        if bound is not None and not math.isfinite(bound):
+            raise EvidenceError("input %r must have a finite %s" % (name, bound_name))
+    if low is not None and high is not None and low > high:
+        raise EvidenceError("input %r has low (%r) above high (%r)" % (name, low, high))
+    if (low is not None and value < low) or (high is not None and value > high):
         raise EvidenceError(
             "input %r has a base value (%r) outside its own range [%r, %r]. "
             "Either the base case or the range is wrong." % (name, value, low, high)
@@ -267,6 +273,12 @@ def grade_evidence(
             raise EvidenceError(
                 "unknown confidence level %r in evidence grading" % confidence
             )
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise EvidenceError("evidence contributions must be finite numbers")
         pairs.append((confidence, abs(float(value))))
 
     total = sum(value for _, value in pairs)

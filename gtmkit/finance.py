@@ -21,6 +21,7 @@ Conventions used throughout:
 
 from __future__ import annotations
 
+import math
 from typing import List, Optional, Sequence
 
 __all__ = [
@@ -57,8 +58,8 @@ def _validate(cash_flows: Sequence[float]) -> List[float]:
     for i, value in enumerate(flows):
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise InvalidCashFlows("period %d is not a number: %r" % (i, value))
-        if value != value:  # NaN
-            raise InvalidCashFlows("period %d is NaN" % i)
+        if not math.isfinite(value):
+            raise InvalidCashFlows("period %d must be finite, got %r" % (i, value))
     return [float(v) for v in flows]
 
 
@@ -69,6 +70,15 @@ def present_value(amount: float, rate: float, period: int) -> float:
     and not ``period + 1``. Off-by-one here silently inflates or deflates every
     business case built on top of it, so it lives in one place.
     """
+    for name, value in (("amount", amount), ("rate", rate)):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise InvalidCashFlows("%s must be a finite number" % name)
+    if not isinstance(period, int) or isinstance(period, bool):
+        raise InvalidCashFlows("period must be an integer")
     if period < 0:
         raise InvalidCashFlows("period must be >= 0, got %d" % period)
     if rate <= -1.0:
@@ -111,7 +121,7 @@ def irr(
     * NPV does not change sign across the search bracket.
 
     A series with multiple sign changes can have multiple mathematically valid
-    IRRs. This function returns the lowest one in the bracket and callers that
+    IRRs. Bisection returns a root in the bracket, not necessarily the lowest; callers that
     care should check :func:`sign_changes`. In practice, if your business case
     has a non-conventional cash flow shape, IRR is the wrong headline metric and
     you should lead with NPV.
@@ -126,6 +136,10 @@ def irr(
 
     f_low = f(low)
     f_high = f(high)
+    if f_low == 0:
+        return low
+    if f_high == 0:
+        return high
     if f_low * f_high > 0:
         return None
 
