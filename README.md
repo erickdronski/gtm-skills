@@ -16,7 +16,7 @@
   <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-0-08775c">
   <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-174ea6">
   <img alt="Linux macOS Windows" src="https://img.shields.io/badge/tested_on-Linux%20%7C%20macOS%20%7C%20Windows-0f766e">
-  <img alt="326 tests" src="https://img.shields.io/badge/tests-326-6b21a8">
+  <img alt="334 tests" src="https://img.shields.io/badge/tests-334-6b21a8">
   <a href="https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
