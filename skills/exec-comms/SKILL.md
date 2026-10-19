@@ -1,6 +1,6 @@
 ---
 name: exec-comms
-description: Write executive-level business communication — board updates, QBRs, stakeholder updates, escalations, proposals, and decision memos — structured so the reader gets the decision in the first paragraph. Use this whenever the user asks to write or review something going to executives, a board, a leadership team, or a customer sponsor: a board update, QBR deck, exec summary, status report, decision memo, escalation, budget request, or "make this shorter and sharper for leadership". Also use it when a draft buries its ask under context.
+description: Write executive-level business communication — board updates, QBRs, stakeholder updates, escalations, proposals, and decision memos — structured so the reader gets the decision in the first paragraph. Use this whenever the user asks to write or review something going to executives, a board, a leadership team, or a customer sponsor, including a board update, QBR deck, exec summary, status report, decision memo, escalation, budget request, or "make this shorter and sharper for leadership". Also use it when a draft buries its ask under context.
 ---
 
 # Executive communication
