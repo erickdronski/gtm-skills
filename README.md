@@ -44,8 +44,7 @@ The CLI also works without an AI agent or API key.
 /plugin install gtm-skills
 ```
 
-**Or clone it** — the skills work with any agent that reads `SKILL.md` or
-`AGENTS.md` files, and the CLI tools work standalone:
+**Other agents or the standalone CLI — clone the full repository:**
 
 ```bash
 git clone https://github.com/erickdronski/gtm-skills
@@ -55,6 +54,30 @@ python3 -m unittest discover -s tests -t .
 
 No dependencies. No install step. No API key. Python 3.9+ and nothing else —
 the entire engine is standard library, offline, and does not phone home.
+
+Open the clone in your agent and ask it to read the relevant
+`skills/<name>/SKILL.md`. Skill discovery varies by agent; reading the root
+`AGENTS.md` alone does not load all nine skills. Keep `gtmkit/`, `skills/`, and
+`examples/` together so the calculations and referenced resources are available.
+
+Run the CLI from the repository root, or set the repository path when working
+elsewhere (these shell examples use Bash or Zsh):
+
+```bash
+export GTM_SKILLS_ROOT="/absolute/path/to/gtm-skills"
+PYTHONPATH="$GTM_SKILLS_ROOT" python3 -m gtmkit.valuecase \
+  "$GTM_SKILLS_ROOT/examples/value-case/northwind-support-deflection.json"
+```
+
+In skill command examples, `${CLAUDE_PLUGIN_ROOT}` is the path supplied by
+Claude's plugin installation. For a clone, replace it with `${GTM_SKILLS_ROOT}`
+in both `PYTHONPATH` and resource paths, and quote paths that contain spaces.
+
+**Individual skill copies are incomplete installs.** Tools such as
+`npx skills add` copy the selected skill directories but omit the shared
+repo-root `gtmkit/` engine and `examples/`. Use the full plugin or clone above
+for the calculation workflows; an individual `SKILL.md` is not a standalone
+package.
 
 ## See it work
 
