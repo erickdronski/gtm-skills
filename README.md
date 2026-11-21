@@ -5,7 +5,7 @@ reproducible Python calculations.
 
 [![CI](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-101828)](LICENSE)
-![334 tests](https://img.shields.io/badge/tests-334-6b21a8)
+![346 tests](https://img.shields.io/badge/tests-346-6b21a8)
 
 [Install](#install) · [Example](#see-it-work) ·
 [Assumptions](#the-assumption-ledger) · [Skills](#the-nine-skills) ·
@@ -93,14 +93,16 @@ Grade C. 35% of modeled value rests on assumptions and only 33% on measured
 facts. State this before the reader finds it, and prioritize measuring the
 largest assumption.
 
-**Measure this first — Tickets deflected to self-service / deflection_rate.**
-This one input moves NPV by $339.9k across its stated range and it flips the
+**Measure this first — Tickets deflected to self-service, Reduced handle time on retained tickets / deflection_rate.**
+This one input moves NPV by $311.6k across its stated range and it flips the
 decision at a stated bound.
 ```
 
 This is output from the included example, not a reported customer outcome.
 The engine grades the declared evidence, identifies the input most worth
 measuring, and reports whether its uncertainty could change the decision.
+The example uses one deflection rate for both avoided tickets and handle time on
+remaining tickets. Changing the rate updates both benefit streams.
 It validates the structure and specificity of source descriptions; a reviewer
 still needs to verify the underlying evidence.
 
@@ -123,7 +125,7 @@ Vague source descriptions are rejected during validation, including:
 > a bare analyst-firm name · `estimated` · `TBD` · `assumed`
 
 ```
-spec error: driver 'deflection': source for 'deflection_rate' reads as an
+spec error: shared input 'deflection_rate': source for 'deflection_rate' reads as an
 unfalsifiable claim: 'industry standard'. Replace it with a specific artifact
 (a named export, dashboard, contract, or a stated derivation). If the number
 really is unmeasured, mark it confidence='assumption' and give it a range.

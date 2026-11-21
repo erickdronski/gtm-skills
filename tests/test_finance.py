@@ -119,6 +119,27 @@ class TestPayback(unittest.TestCase):
             "discounting must make payback later, never earlier",
         )
 
+    def test_delayed_investment_never_recovers(self):
+        for flows in ([0, -100, 60], [0, 0, -100], [30, -100, 20]):
+            with self.subTest(flows=flows):
+                self.assertIsNone(finance.payback_period(flows))
+                self.assertIsNone(finance.discounted_payback_period(0.1, flows))
+
+    def test_delayed_investment_recovers_from_the_actual_outlay(self):
+        # At 10%, the PV of the outlay is 100/1.1; year two earns 200/1.1**2.
+        self.assertEqual(finance.payback_period([0, -100, 200]), 1.5)
+        self.assertAlmostEqual(
+            finance.discounted_payback_period(0.1, [0, -100, 200]), 1.55
+        )
+        self.assertEqual(finance.payback_period([0, 0, -100, 100]), 3)
+        self.assertIsNone(finance.discounted_payback_period(0.1, [0, -100, 100]))
+
+    def test_no_funding_deficit_is_still_immediate(self):
+        for flows in ([0, 0, 0], [0, 50], [100, -50]):
+            with self.subTest(flows=flows):
+                self.assertEqual(finance.payback_period(flows), 0)
+                self.assertEqual(finance.discounted_payback_period(0.1, flows), 0)
+
     def test_immediate_payback(self):
         self.assertEqual(finance.payback_period([100, 50]), 0.0)
 

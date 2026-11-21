@@ -41,6 +41,7 @@ PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.valuecase case.json --check
 | `horizon_years` | yes | Integer, 1–10. |
 | `discount_rate_annual` | yes | Decimal between -0.5 and 1.0. `0.12`, never `12`. |
 | `meta` | no | Free-form object, passed through to JSON output. |
+| `shared_inputs` | no | Named input definitions used by explicit `ref` entries in drivers. |
 | `drivers` | yes | Non-empty array. |
 | `costs` | yes | Non-empty array. |
 
@@ -100,6 +101,32 @@ the whole format.
 | `low` / `high` | see below | Numbers; `low <= value <= high`. |
 | `unit` | no | Rendered in the ledger. |
 | `note` | no | Free text. |
+
+### Sharing an input across drivers
+
+Define the number once in `shared_inputs` when the same assumption affects
+several formulas. Each driver opts in with a reference. The local formula
+name can differ from the shared name.
+
+```json
+"shared_inputs": {
+  "deflection_rate": {
+    "value": 0.18, "low": 0.10, "high": 0.24, "confidence": "assumption",
+    "source": "Observed range in the three reference-customer reviews"
+  }
+}
+```
+
+In the `inputs` of each participating driver, use
+`"deflection_rate": {"ref": "deflection_rate"}`. Supply the value, bounds,
+and evidence only in the shared definition. The sensitivity analysis varies
+all references together in one row. The floor case chooses the adverse bound
+from their combined effect. Two inline declarations remain independent even
+when they use the same name.
+
+For Python scenario overrides, setting one reference in `npv_with`,
+`benefit_flows`, or `net_flows` updates every use. Conflicting overrides of the
+same shared input raise `SpecError`.
 
 ### The three confidence levels
 

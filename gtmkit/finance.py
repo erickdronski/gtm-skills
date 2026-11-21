@@ -175,20 +175,14 @@ def cumulative(cash_flows: Sequence[float]) -> List[float]:
 
 
 def _first_crossing(running: Sequence[float]) -> Optional[float]:
-    """Period at which a running total first reaches zero, interpolated."""
-    for i, total in enumerate(running):
-        if total >= 0:
-            if i == 0:
-                return 0.0
-            previous = running[i - 1]
-            step = total - previous
-            if step <= 0:
-                return float(i)
-            # Linear interpolation inside the period the investment turns
-            # positive. Reporting "14 months" instead of "year 2" is the
-            # difference between a credible case and a rounded one.
-            return (i - 1) + (-previous / step)
-    return None
+    """First recovery from a cumulative deficit, measured from period zero."""
+    for i in range(1, len(running)):
+        previous, current = running[i - 1], running[i]
+        if previous < 0 <= current:
+            return (i - 1) + (-previous / (current - previous))
+    # Without an upward crossing, a final deficit was never recovered.
+    # Otherwise the balance was never negative and no capital needed recovery.
+    return None if running[-1] < 0 else 0.0
 
 
 def payback_period(cash_flows: Sequence[float]) -> Optional[float]:
