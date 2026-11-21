@@ -1,26 +1,15 @@
-<h1 align="center">gtm-skills</h1>
+# gtm-skills
 
-<p align="center"><strong>Evidence-based go-to-market workflows for AI agents, backed by a tested Python engine.</strong></p>
+Business cases and go-to-market analysis with explicit assumptions and
+reproducible Python calculations.
 
-<p align="center">
-  <a href="#install">Install</a> ·
-  <a href="#the-nine-skills">Skills</a> ·
-  <a href="#see-it-work">See it work</a> ·
-  <a href="#the-assumption-ledger">Why it's different</a> ·
-  <a href="#the-engine">Engine</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a>
-</p>
+[![CI](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml)
+[![MIT license](https://img.shields.io/badge/license-MIT-101828)](LICENSE)
+![334 tests](https://img.shields.io/badge/tests-334-6b21a8)
 
-<p align="center">
-  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-101828">
-  <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-0-08775c">
-  <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-174ea6">
-  <img alt="Linux macOS Windows" src="https://img.shields.io/badge/tested_on-Linux%20%7C%20macOS%20%7C%20Windows-0f766e">
-  <img alt="334 tests" src="https://img.shields.io/badge/tests-334-6b21a8">
-  <a href="https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg"></a>
-</p>
-
----
+[Install](#install) · [Example](#see-it-work) ·
+[Assumptions](#the-assumption-ledger) · [Skills](#the-nine-skills) ·
+[Engine](#the-engine)
 
 Build business cases, prioritize accounts, assess deals, and plan go-to-market
 investments with calculations a reviewer can inspect. **gtm-skills** combines
