@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-11-20
+
+- Value cases support shared inputs with one evidence record and explicit
+  references across drivers. Sensitivity ranges, scenario overrides, and the
+  floor case move every reference together. Inline inputs retain their
+  existing driver-local behavior.
+- The Northwind example now uses one ticket-deflection assumption for both
+  affected benefit streams. Its NPV swing is $311.6k across the 10–24% range.
+  The base NPV remains $105.2k.
+- Simple and discounted payback now measure the first recovery from a
+  cumulative deficit even when the outlay occurs after kickoff. An investment
+  that never recovers reports no payback within the modeled horizon.
+- Includes earlier fixes on the default branch for sensitivity decision flips,
+  finite financial inputs, and installation of the complete skill pack.
+
 ## [0.2.0] — 2026-10-06
 
 Deal qualification and pipeline math move from the model into the engine.

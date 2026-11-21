@@ -48,9 +48,9 @@ Design choices worth knowing about:
   curve); realization is a flat haircut for the gap between modeled and captured
   value. Conflating them hides which one you are actually arguing about.
 * **Sensitivity is one-at-a-time.** Each ranged input is swung to its low and
-  high while everything else holds at base. This produces a tornado, which is
-  what reviewers expect, and it deliberately does not compound worst cases —
-  a simultaneous adverse-bound scenario is reported separately as the floor.
+  high at all of its explicit references while everything else holds at base.
+  The tornado reports these individual changes. A simultaneous adverse-bound
+  scenario is reported separately as the floor.
   This is a stress test, not a global minimum for interacting inputs.
 """
 
@@ -214,9 +214,27 @@ class ValueCase:
     def benefit_flows(
         self, overrides: Optional[Mapping[str, Mapping[str, float]]] = None
     ) -> List[float]:
+        # References to the same declared input resolve to one Input object.
+        # Separate inline declarations stay independent, even with identical names.
+        values: Dict[Input, float] = {}
+        for driver in self.drivers:
+            for name, value in (overrides or {}).get(driver.id, {}).items():
+                inp = driver.inputs.get(name)
+                if inp is None:
+                    continue
+                if inp in values and values[inp] != value:
+                    raise SpecError(
+                        "conflicting overrides for shared input %r" % inp.name
+                    )
+                values[inp] = value
+
         totals = [0.0] * (self.horizon + 1)
         for driver in self.drivers:
-            driver_overrides = (overrides or {}).get(driver.id)
+            driver_overrides = {
+                name: values[inp]
+                for name, inp in driver.inputs.items()
+                if inp in values
+            }
             for i, value in enumerate(driver.schedule(self.horizon, driver_overrides)):
                 totals[i] += value
         return totals
@@ -272,32 +290,40 @@ class ValueCase:
         """One-at-a-time tornado over every input that declares a range."""
         base = self.npv_with()
         rows: List[Dict[str, Any]] = []
+        uses: Dict[Input, List[Tuple[Driver, str]]] = {}
         for driver in self.drivers:
             for name, inp in driver.inputs.items():
-                if inp.low is None and inp.high is None:
-                    continue
-                low, high = inp.range
-                npv_low = self.npv_with({driver.id: {name: low}})
-                npv_high = self.npv_with({driver.id: {name: high}})
-                rows.append(
-                    {
-                        "driver_id": driver.id,
-                        "driver_label": driver.label,
-                        "input": name,
-                        "confidence": inp.confidence,
-                        "base": inp.value,
-                        "low": low,
-                        "high": high,
-                        "npv_low": npv_low,
-                        "npv_high": npv_high,
-                        "swing": abs(npv_high - npv_low),
-                        "downside": min(npv_low, npv_high, base) - base,
-                        "upside": max(npv_low, npv_high, base) - base,
-                        "flips_decision": any(
-                            (value < 0) != (base < 0) for value in (npv_low, npv_high)
-                        ),
-                    }
-                )
+                if inp.low is not None or inp.high is not None:
+                    uses.setdefault(inp, []).append((driver, name))
+
+        for inp, members in uses.items():
+            driver, name = members[0]
+            low, high = inp.range
+            npv_low = self.npv_with({driver.id: {name: low}})
+            npv_high = self.npv_with({driver.id: {name: high}})
+            row: Dict[str, Any] = {
+                "driver_id": driver.id,
+                "driver_label": ", ".join(dict.fromkeys(d.label for d, _ in members)),
+                "input": name,
+                "confidence": inp.confidence,
+                "base": inp.value,
+                "low": low,
+                "high": high,
+                "npv_low": npv_low,
+                "npv_high": npv_high,
+                "swing": abs(npv_high - npv_low),
+                "downside": min(npv_low, npv_high, base) - base,
+                "upside": max(npv_low, npv_high, base) - base,
+                "flips_decision": any(
+                    (value < 0) != (base < 0) for value in (npv_low, npv_high)
+                ),
+            }
+            if len(members) > 1:
+                row["shared_input"] = inp.name
+                row["applies_to"] = [
+                    {"driver_id": d.id, "input": n} for d, n in members
+                ]
+            rows.append(row)
         rows.sort(key=lambda r: r["swing"], reverse=True)
         return rows
 
@@ -311,15 +337,9 @@ class ValueCase:
         """
         overrides: Dict[str, Dict[str, float]] = {}
         base = self.npv_with()
-        for driver in self.drivers:
-            for name, inp in driver.inputs.items():
-                if inp.low is None and inp.high is None:
-                    continue
-                low, high = inp.range
-                trial_low = self.npv_with({driver.id: {name: low}})
-                trial_high = self.npv_with({driver.id: {name: high}})
-                worst = low if trial_low <= trial_high else high
-                overrides.setdefault(driver.id, {})[name] = worst
+        for row in self.sensitivity():
+            worst = row["low"] if row["npv_low"] <= row["npv_high"] else row["high"]
+            overrides.setdefault(row["driver_id"], {})[row["input"]] = worst
         flows = self.net_flows(overrides)
         return {
             "npv": finance.npv(self.discount_rate, flows),
@@ -423,9 +443,9 @@ class ValueCase:
             "floor_case": self.floor_case(),
             "evidence": self.evidence(),
             "ledger": [
-                dict(inp.to_dict(), driver=driver.id)
+                dict(inp.to_dict(), name=name, driver=driver.id)
                 for driver in self.drivers
-                for inp in driver.inputs.values()
+                for name, inp in driver.inputs.items()
             ],
         }
 
@@ -752,10 +772,30 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
     if not isinstance(raw_drivers, list) or not raw_drivers:
         raise SpecError("spec needs a non-empty 'drivers' array")
 
+    raw_shared = spec.get("shared_inputs", {})
+    if not isinstance(raw_shared, Mapping):
+        raise SpecError("'shared_inputs' must be an object of named input definitions")
+    shared_inputs: Dict[str, Input] = {}
+    for key, definition in raw_shared.items():
+        if not isinstance(key, str) or not key.strip():
+            raise SpecError("shared input names must be non-empty strings")
+        if isinstance(definition, Mapping) and "ref" in definition:
+            raise SpecError(
+                "shared input %r must define its evidence directly, without a ref" % key
+            )
+        try:
+            shared_inputs[key] = validate_input(key, definition)
+        except EvidenceError as exc:
+            raise SpecError("shared input %r: %s" % (key, exc)) from exc
+
     drivers: List[Driver] = []
     seen_ids = set()
     for index, raw in enumerate(raw_drivers):
-        drivers.append(_build_driver(raw, index, horizon, seen_ids))
+        drivers.append(_build_driver(raw, index, horizon, seen_ids, shared_inputs))
+    used = {inp for d in drivers for inp in d.inputs.values()}
+    unused = sorted(name for name, inp in shared_inputs.items() if inp not in used)
+    if unused:
+        raise SpecError("unused shared input(s): %s" % ", ".join(unused))
 
     costs: List[CostLine] = []
     raw_costs = spec.get("costs") or []
@@ -782,7 +822,13 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
     )
 
 
-def _build_driver(raw: Any, index: int, horizon: int, seen_ids: set) -> Driver:
+def _build_driver(
+    raw: Any,
+    index: int,
+    horizon: int,
+    seen_ids: set,
+    shared_inputs: Mapping[str, Input],
+) -> Driver:
     where = "drivers[%d]" % index
     if not isinstance(raw, Mapping):
         raise SpecError("%s must be an object" % where)
@@ -806,7 +852,20 @@ def _build_driver(raw: Any, index: int, horizon: int, seen_ids: set) -> Driver:
     inputs: Dict[str, Input] = {}
     for input_name, raw_input in raw_inputs.items():
         try:
-            inputs[input_name] = validate_input(input_name, raw_input)
+            if isinstance(raw_input, Mapping) and "ref" in raw_input:
+                ref = raw_input["ref"]
+                if len(raw_input) != 1:
+                    raise EvidenceError(
+                        "input %r must declare its shared ref alone" % input_name
+                    )
+                if not isinstance(ref, str) or ref not in shared_inputs:
+                    raise EvidenceError(
+                        "input %r references unknown shared input %r"
+                        % (input_name, ref)
+                    )
+                inputs[input_name] = shared_inputs[ref]
+            else:
+                inputs[input_name] = validate_input(input_name, raw_input)
         except EvidenceError as exc:
             raise SpecError("driver %r: %s" % (driver_id, exc)) from exc
 

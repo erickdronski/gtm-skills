@@ -8,6 +8,7 @@ with no README at all.
 import json
 import os
 import unittest
+from copy import deepcopy
 
 from gtmkit.valuecase import SpecError, load_spec, validate_spec
 
@@ -81,6 +82,24 @@ class TestCashFlows(unittest.TestCase):
         net = self.case.net_flows()
         for i in range(len(net)):
             self.assertAlmostEqual(net[i], benefits[i] - costs[i])
+
+    def test_delayed_cost_never_recovers_in_the_report(self):
+        spec = minimal_spec(horizon_years=2, discount_rate_annual=0.1)
+        driver = spec["drivers"][0]
+        driver["formula"] = "gain"
+        driver["inputs"] = {
+            "gain": {
+                "value": 60,
+                "confidence": "fact",
+                "source": "Contract schedule for year two",
+            }
+        }
+        driver.update(ramp=[0, 1], realization=1)
+        spec["costs"] = [{"id": "year_one", "schedule": [0, 100, 0]}]
+        case = validate_spec(spec)
+        self.assertIsNone(case.summary()["discounted_payback_periods"])
+        self.assertIsNone(case.floor_case()["payback_periods"])
+        self.assertNotIn("immediate", case.to_markdown())
 
     def test_ramp_shorter_than_horizon_holds_last_value(self):
         spec = minimal_spec()
@@ -178,6 +197,92 @@ class TestSensitivity(unittest.TestCase):
         rows = validate_spec(spec).sensitivity()
         swings = [r["swing"] for r in rows]
         self.assertEqual(swings, sorted(swings, reverse=True))
+
+
+class TestSharedInputs(unittest.TestCase):
+    def setUp(self):
+        self.rate = minimal_spec()["drivers"][0]["inputs"]["rate"]
+        # Gross savings are 100r + 40(1-r). Subtract a fixed 50 at kickoff.
+        self.spec = minimal_spec(
+            horizon_years=1,
+            discount_rate_annual=0,
+            shared_inputs={"fraction": self.rate},
+            drivers=[
+                {
+                    "id": "saved",
+                    "formula": "100 * r",
+                    "inputs": {"r": {"ref": "fraction"}},
+                },
+                {
+                    "id": "retained",
+                    "formula": "40 * (1 - share)",
+                    "inputs": {"share": {"ref": "fraction"}},
+                },
+            ],
+            costs=[{"id": "setup", "schedule": [50, 0]}],
+        )
+
+    def test_one_sensitivity_row_and_one_attainable_floor(self):
+        case = validate_spec(self.spec)
+        (row,) = case.sensitivity()
+        self.assertEqual(row["shared_input"], "fraction")
+        self.assertAlmostEqual(row["npv_low"], -4)
+        self.assertAlmostEqual(row["npv_high"], 8)
+        self.assertAlmostEqual(row["swing"], 12)
+        self.assertTrue(row["flips_decision"])
+        self.assertAlmostEqual(case.floor_case()["npv"], -4)
+        self.assertAlmostEqual(case.evidence()["largest_assumption"]["swing"], 12)
+        self.assertEqual(
+            [entry["name"] for entry in case.to_dict()["ledger"]], ["r", "share"]
+        )
+
+    def test_floor_uses_the_jointly_adverse_bound(self):
+        self.spec["drivers"][0]["formula"] = "10 * r"
+        # The first driver improves as r rises, but the combined case loses 30r.
+        case = validate_spec(self.spec)
+        (row,) = case.sensitivity()
+        self.assertAlmostEqual(row["npv_low"], -13)
+        self.assertAlmostEqual(row["npv_high"], -19)
+        self.assertAlmostEqual(case.floor_case()["npv"], -19)
+
+    def test_overrides_follow_references_and_reject_conflicts(self):
+        case = validate_spec(self.spec)
+        self.assertAlmostEqual(case.npv_with({"retained": {"share": 0.1}}), -4)
+        same = {"saved": {"r": 0.3}, "retained": {"share": 0.3}}
+        self.assertAlmostEqual(case.npv_with(same), 8)
+        with self.assertRaisesRegex(SpecError, "fraction"):
+            case.npv_with({"saved": {"r": 0.1}, "retained": {"share": 0.3}})
+
+    def test_unlinked_inputs_with_the_same_name_remain_independent(self):
+        del self.spec["shared_inputs"]
+        for driver in self.spec["drivers"]:
+            driver["inputs"] = {"r": deepcopy(self.rate)}
+        self.spec["drivers"][1]["formula"] = "40 * (1 - r)"
+        case = validate_spec(self.spec)
+        self.assertEqual(len(case.sensitivity()), 2)
+        self.assertAlmostEqual(case.npv_with({"saved": {"r": 0.1}}), -8)
+        self.assertAlmostEqual(case.floor_case()["npv"], -12)
+
+    def test_shared_inputs_keep_normal_evidence_validation(self):
+        del self.rate["low"]
+        with self.assertRaisesRegex(SpecError, "fraction.*low"):
+            validate_spec(self.spec)
+
+    def test_unused_or_ambiguous_shared_definitions_are_rejected(self):
+        self.spec["shared_inputs"]["unused"] = deepcopy(self.rate)
+        with self.assertRaisesRegex(SpecError, "unused shared input"):
+            validate_spec(self.spec)
+        del self.spec["shared_inputs"]["unused"]
+        self.rate["ref"] = "fraction"
+        with self.assertRaisesRegex(SpecError, "shared input 'fraction'.*ref"):
+            validate_spec(self.spec)
+
+    def test_references_must_exist_and_cannot_redefine_the_input(self):
+        for invalid in ({"ref": "missing"}, {"ref": []}, {"ref": "fraction", "low": 0}):
+            with self.subTest(invalid=invalid):
+                self.spec["drivers"][0]["inputs"]["r"] = invalid
+                with self.assertRaisesRegex(SpecError, "driver 'saved'.*'r'"):
+                    validate_spec(self.spec)
 
 
 class TestSpecValidation(unittest.TestCase):
@@ -299,6 +404,24 @@ class TestShippedExample(unittest.TestCase):
         top = self.case.sensitivity()[0]
         self.assertTrue(top["flips_decision"])
         self.assertEqual(top["input"], "deflection_rate")
+
+    def test_deflection_sensitivity_changes_both_ticket_populations(self):
+        rows = [r for r in self.case.sensitivity() if r["input"] == "deflection_rate"]
+        self.assertEqual(len(rows), 1)
+
+        # Compute both ticket populations independently of model overrides.
+        def net_at(rate):
+            net = [-217000]
+            for i, cost in enumerate((126000, 116880, 119846)):
+                deflected = 124800 * rate * 12.81 * (0.4, 0.9, 1)[i] * 0.85
+                retained = 124800 * (1 - rate) * 1.8 / 60 * 39.42 * (0.5, 1, 1)[i] * 0.7
+                backfill = 20 * 0.04 * 18500 * (0, 0.6, 1)[i] * 0.6
+                net.append(deflected + retained + backfill - cost)
+            return sum(value / 1.12**i for i, value in enumerate(net))
+
+        self.assertAlmostEqual(rows[0]["npv_low"], net_at(0.10))
+        self.assertAlmostEqual(rows[0]["npv_high"], net_at(0.24))
+        self.assertIn("$311.6k", self.case.to_markdown())
 
     def test_renders_markdown_without_error(self):
         markdown = self.case.to_markdown()

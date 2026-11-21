@@ -128,6 +128,10 @@ to the customer than the model itself.
 **Whether any input flips the decision.** An input that turns NPV negative at
 either bound is the real subject of the meeting. Lead with it.
 
+When two drivers use the same assumption, declare it once in `shared_inputs`
+and reference it from both formulas. For example, raising ticket deflection
+also reduces the volume available for handling-time savings.
+
 **The floor case.** Every ranged input at its unfavorable bound simultaneously.
 If the case still clears zero at the floor, that is the strongest sentence
 available to you and it should be in the first paragraph. If it does not, say
