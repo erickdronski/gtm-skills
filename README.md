@@ -261,8 +261,6 @@ Part of a set of small, standalone tools for working with coding agents:
 |---|---|
 | [agentsmith](https://github.com/erickdronski/agentsmith) | Derives your AGENTS.md from the repo and detects drift |
 | [contexttest](https://github.com/erickdronski/contexttest) | A/B tests whether an AGENTS.md change actually helps |
-| [burnrate](https://github.com/erickdronski/burnrate) | Prices what your agent sessions cost, with a hard spend cap |
-| [tripwire](https://github.com/erickdronski/tripwire) | Audits what your agent is allowed to do |
 
 ## License
 
