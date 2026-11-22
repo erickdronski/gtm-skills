@@ -1,3 +1,64 @@
+[build-system]
+# 77 is the first setuptools that reads the SPDX `license` string below. On
+# 77 and later, the older TOML-table form and the license classifier both raise
+# deprecation warnings that set a 2027-02-18 deadline for removing them.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtm-skills"
+# gtmkit.__version__ is the single source of truth. tests/test_packaging.py
+# checks that this file, the package, and .claude-plugin/plugin.json agree.
+dynamic = ["version"]
+description = "Business cases and go-to-market analysis with explicit assumptions and reproducible Python calculations."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Erick Dronski" }]
+keywords = [
+  "go-to-market", "business-case", "roi", "npv", "pricing", "icp",
+  "meddpicc", "pipeline", "forecasting", "agent-skills",
+]
+# Kept in step with the CI matrix by tests/test_packaging.py.
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Financial",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/erickdronski/gtm-skills"
+Repository = "https://github.com/erickdronski/gtm-skills"
+Changelog = "https://github.com/erickdronski/gtm-skills/blob/main/CHANGELOG.md"
+Issues = "https://github.com/erickdronski/gtm-skills/issues"
+
+[project.scripts]
+gtmkit = "gtmkit.cli:main"
+
+[tool.setuptools]
+# The engine only. skills/, examples/ and tests/ stay in the repository; the
+# starter specs `gtmkit init` prints ship as copies under gtmkit/templates/.
+packages = ["gtmkit"]
+# Data files are listed explicitly below rather than swept in from a manifest.
+include-package-data = false
+
+[tool.setuptools.package-data]
+gtmkit = ["templates/*.json"]
+
+[tool.setuptools.dynamic]
+version = { attr = "gtmkit.__version__" }
+
 [tool.ruff]
 # The package targets Python 3.9, so pyupgrade must not propose 3.10+ syntax
 # (`X | None`, builtin generics at runtime). Setting this here is the

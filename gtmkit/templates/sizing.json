@@ -1,0 +1,45 @@
+{
+  "name": "Agent observability — North America mid-market and up",
+  "currency": "USD",
+  "bottom_up": {
+    "units": {
+      "value": 41200,
+      "confidence": "fact",
+      "source": "US and Canada companies with 200+ employees and a public engineering job posting in the last 12 months; Crunchbase and Greenhouse export, 2026-07-02",
+      "low": 34000,
+      "high": 48000
+    },
+    "attach_rate": {
+      "value": 0.34,
+      "confidence": "assumption",
+      "source": "Share running enough autonomous agent workload to need dedicated observability; triangulated from our own 2026 install base where 31% of eligible accounts bought, and from the 38% of survey respondents reporting agents in production",
+      "low": 0.18,
+      "high": 0.5
+    },
+    "annual_price": {
+      "value": 21600,
+      "confidence": "fact",
+      "source": "Blended realized ACV across 84 closed-won deals in FY2026, from the Salesforce closed-won report dated 2026-07-01",
+      "low": 16000,
+      "high": 27000
+    }
+  },
+  "top_down": {
+    "market_total": {
+      "value": 6800000000,
+      "confidence": "assumption",
+      "source": "Published 2026 observability and APM market total for North America, taken from two vendor S-1 filings that disclose their own TAM methodology",
+      "low": 4900000000,
+      "high": 8400000000
+    },
+    "share": {
+      "value": 0.055,
+      "confidence": "assumption",
+      "source": "Agent-specific workloads as a share of total observability spend; anchored on the 4-7% that container-native monitoring held three years into its own adoption curve",
+      "low": 0.03,
+      "high": 0.09
+    }
+  },
+  "sam_share": 0.46,
+  "som_share": 0.055
+}

@@ -16,9 +16,10 @@ Checks, in rough order of how often they catch something real:
 * Every relative link and referenced file actually exists. A skill that points
   at a missing reference wastes an agent's turn discovering that.
 * Every ``gtmkit.<module>`` mention names a module that exists, and every
-  ``python3 -m gtmkit.<module>`` command — in SKILL.md and in references/ —
-  invokes a runnable module with flags its CLI actually accepts. A documented
-  flag that argparse rejects costs the agent a failed run and a guess.
+  ``python3 -m gtmkit.<module>`` or ``gtmkit <analysis>`` command — in SKILL.md,
+  in references/, and in the README — invokes a runnable module with flags its
+  CLI actually accepts. A documented flag that argparse rejects costs the agent
+  a failed run and a guess.
 * SKILL.md stays under the length where it stops being loaded usefully.
 * No unresolved placeholders (``TODO``, ``TBD``, ``XXX``, ``FIXME``, ``...``)
   left in shipped text.
@@ -57,6 +58,12 @@ GTMKIT_RE = re.compile(r"gtmkit\.([a-z_]+)")
 # continuations are joined before matching, so a multi-line invocation in a
 # fenced block is checked as the one command it is.
 COMMAND_RE = re.compile(r"python3?\s+-m\s+gtmkit\.([a-z_]+)([^\n]*)")
+# The installed front door, ``gtmkit <analysis> ...``. Matched only where a
+# command can start (a line, optionally after a ``$`` prompt, or inline code),
+# so prose that merely mentions gtmkit is not read as a command.
+FRONT_DOOR_RE = re.compile(
+    r"(?:^[ \t]*(?:\$[ \t]+)?|`)gtmkit[ \t]+([a-z][a-z_]*)([^\n`]*)", re.MULTILINE
+)
 CONTINUATION_RE = re.compile(r"\\\n\s*")
 FLAG_RE = re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]*)")
 ADD_ARGUMENT_RE = re.compile(r"add_argument\(\s*((?:\"[^\"]*\"\s*,\s*)*\"[^\"]*\")")
@@ -102,28 +109,36 @@ def command_problems(text: str) -> List[str]:
     """
     problems: List[str] = []
     joined = CONTINUATION_RE.sub(" ", text)
-    for match in COMMAND_RE.finditer(joined):
-        module = match.group(1)
+    commands = [
+        ("python3 -m gtmkit.%s" % m.group(1), m.group(1), m.group(2))
+        for m in COMMAND_RE.finditer(joined)
+    ]
+    for match in FRONT_DOOR_RE.finditer(joined):
+        name = match.group(1)
+        # `gtmkit init` is the front door's own subcommand, defined in cli.py.
+        module = "cli" if name == "init" else name
+        commands.append(("gtmkit %s" % name, module, match.group(2)))
+
+    for shown, module, rest in commands:
         flags = module_flags(module)
         if flags is None:
-            # Reported once by the module-existence check; a second error for
-            # the same typo is noise.
+            # Reported once by the module-existence check (or, for the front
+            # door, not a gtmkit command at all); a second error is noise.
             continue
         if not module_is_runnable(module):
             problems.append(
-                "runs `python3 -m gtmkit.%s`, but that module has no main() "
-                "entry point" % module
+                "runs `%s`, but that module has no main() entry point" % shown
             )
             continue
         # Strip a trailing shell comment so prose like "# --format json is
         # also available" is not read as part of the command.
-        arguments = re.split(r"\s#", match.group(2), maxsplit=1)[0]
+        arguments = re.split(r"\s#", rest, maxsplit=1)[0]
         for flag in FLAG_RE.findall(arguments):
             if flag not in flags:
                 accepted = ", ".join(sorted(f for f in flags if f.startswith("--")))
                 problems.append(
-                    "shows `gtmkit.%s %s`, which the CLI does not accept. "
-                    "It takes: %s" % (module, flag, accepted)
+                    "shows `%s %s`, which the CLI does not accept. "
+                    "It takes: %s" % (shown, flag, accepted)
                 )
     return problems
 

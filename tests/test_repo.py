@@ -128,6 +128,30 @@ class TestEngineCommandsInDocs(unittest.TestCase):
         )
         self.assertEqual(errors, [])
 
+    def test_front_door_commands_are_checked(self):
+        errors = self.lint("```bash\ngtmkit scoring --rubrik r.json\n```")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("gtmkit scoring --rubrik", errors[0])
+
+    def test_front_door_command_with_real_flags_passes(self):
+        errors = self.lint(
+            "```bash\n$ gtmkit valuecase case.json --format html --out c.html\n"
+            "gtmkit init value-case --out case.json --force\n```\n"
+            "Inline works too: `gtmkit sizing --spec m.json`."
+        )
+        self.assertEqual(errors, [])
+
+    def test_front_door_init_flags_are_checked(self):
+        errors = self.lint("```bash\ngtmkit init deal --output d.json\n```")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("--output", errors[0])
+
+    def test_prose_mentioning_gtmkit_is_not_a_command(self):
+        errors = self.lint(
+            "The engine is gtmkit evidence-first, and gtmkit fmt helpers exist."
+        )
+        self.assertEqual(errors, [])
+
     def test_flags_are_read_from_the_cli_definition(self):
         flags = validate_skills.module_flags("scoring")
         self.assertTrue({"--rubric", "--records", "--name-field"} <= flags)

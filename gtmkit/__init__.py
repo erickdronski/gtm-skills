@@ -36,15 +36,22 @@ Modules:
     carry their sources, the commit view, hygiene flags, and concentration.
 ``fmt``
     Executive-readable number and table formatting.
+``cli``
+    The ``gtmkit`` command. ``gtmkit <analysis> [args...]`` runs any analysis
+    above with its arguments unchanged; ``gtmkit init <kind>`` prints a starter
+    spec.
 
 Every CLI is invoked the same way::
 
     python3 -m gtmkit.<module> --help
+
+or, after ``pip install``, as ``gtmkit <module> --help``.
 """
 
 __version__ = "0.3.0"
 
 __all__ = [
+    "cli",
     "evidence",
     "expr",
     "finance",
