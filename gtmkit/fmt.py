@@ -16,6 +16,7 @@ from typing import Any, Optional, Sequence
 
 __all__ = [
     "bar",
+    "currency_symbol",
     "fmt_count",
     "fmt_currency",
     "fmt_multiple",
@@ -35,6 +36,16 @@ _SYMBOLS = {
 }
 
 
+def currency_symbol(currency: Optional[str] = "USD") -> str:
+    """The prefix :func:`fmt_currency` puts before an amount.
+
+    A known code maps to its symbol; anything else is printed as the code and a
+    space, so an unfamiliar currency is never silently shown as dollars.
+    """
+    code = (currency or "USD").upper()
+    return _SYMBOLS.get(code, code + " ")
+
+
 def fmt_currency(
     amount: Optional[float], currency: str = "USD", precise: bool = False
 ) -> str:
@@ -45,9 +56,7 @@ def fmt_currency(
     """
     if amount is None:
         return "n/a"
-    symbol = _SYMBOLS.get(
-        (currency or "USD").upper(), (currency or "USD").upper() + " "
-    )
+    symbol = currency_symbol(currency)
     sign = "-" if amount < 0 else ""
     value = abs(float(amount))
 

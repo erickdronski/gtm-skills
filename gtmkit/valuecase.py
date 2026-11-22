@@ -5,6 +5,7 @@ Run it directly::
     python3 -m gtmkit.valuecase path/to/case.json
     python3 -m gtmkit.valuecase path/to/case.json --format json
     python3 -m gtmkit.valuecase path/to/case.json --out case.md
+    python3 -m gtmkit.valuecase path/to/case.json --format html --out case.html
 
 The spec format is documented in ``skills/value-case/references/spec-format.md``
 and validated by :func:`validate_spec`. The short version::
@@ -425,6 +426,42 @@ class ValueCase:
 
     # -- output ----------------------------------------------------------
 
+    def basis(self) -> str:
+        """The one-line statement of horizon, discount rate, and currency."""
+        return "%d-year case, discounted at %s annually. All figures in %s." % (
+            self.horizon,
+            fmt_pct(self.discount_rate),
+            self.currency,
+        )
+
+    def headline(self) -> List[Tuple[str, str]]:
+        """The headline block as ``(metric, value)`` pairs.
+
+        Every renderer leads with these, built here once so the markdown brief
+        and the HTML report cannot disagree about the decision-relevant facts.
+        """
+        cur = self.currency
+        summary = self.summary()
+        return [
+            ("Net present value", fmt_currency(summary["npv"], cur)),
+            ("Discounted payback", fmt_periods(summary["discounted_payback_periods"])),
+            (
+                "IRR",
+                fmt_pct(summary["irr_annual"])
+                if summary["irr_annual"] is not None
+                else "not meaningful for this cash flow shape",
+            ),
+            ("Total investment", fmt_currency(summary["total_investment"], cur)),
+            ("Total modeled benefit", fmt_currency(summary["total_benefit"], cur)),
+            ("Margin of safety", _margin_of_safety(summary)),
+        ]
+
+    def to_html(self) -> str:
+        """A self-contained HTML report; see :mod:`gtmkit.report`."""
+        from .report import render_value_case  # report imports this module
+
+        return render_value_case(self)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
@@ -451,39 +488,20 @@ class ValueCase:
 
     def to_markdown(self) -> str:
         cur = self.currency
-        summary = self.summary()
         evidence = self.evidence()
         floor = self.floor_case()
 
         lines: List[str] = []
         lines.append("# %s" % self.name)
         lines.append("")
-        lines.append(
-            "%d-year case, discounted at %s annually. All figures in %s."
-            % (self.horizon, fmt_pct(self.discount_rate), cur)
-        )
+        lines.append(self.basis())
         lines.append("")
 
         # Headline metrics first: a reader who stops after this block should
         # still have the decision-relevant facts.
         lines.append("## Headline")
         lines.append("")
-        headline_rows = [
-            ["Net present value", fmt_currency(summary["npv"], cur)],
-            [
-                "Discounted payback",
-                fmt_periods(summary["discounted_payback_periods"]),
-            ],
-            [
-                "IRR",
-                fmt_pct(summary["irr_annual"])
-                if summary["irr_annual"] is not None
-                else "not meaningful for this cash flow shape",
-            ],
-            ["Total investment", fmt_currency(summary["total_investment"], cur)],
-            ["Total modeled benefit", fmt_currency(summary["total_benefit"], cur)],
-            ["Margin of safety", _margin_of_safety(summary)],
-        ]
+        headline_rows = [list(row) for row in self.headline()]
         lines.append(table(["Metric", "Value"], headline_rows))
         lines.append("")
 
@@ -1000,13 +1018,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         prog="python3 -m gtmkit.valuecase",
         description=(
             "Build an auditable business case from a declarative spec. "
-            "Outputs a markdown brief or the full JSON model."
+            "Outputs a markdown brief, a self-contained HTML report to "
+            "share, or the full JSON model."
         ),
     )
     parser.add_argument("spec", help="path to the business-case JSON spec")
     parser.add_argument(
         "--format",
-        choices=("markdown", "json"),
+        choices=("markdown", "json", "html"),
         default="markdown",
         help="output format (default: markdown)",
     )
@@ -1036,6 +1055,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.format == "json":
         output = json.dumps(case.to_dict(), indent=2, sort_keys=False)
+    elif args.format == "html":
+        output = case.to_html()
     else:
         output = case.to_markdown()
 
