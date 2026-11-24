@@ -12,6 +12,8 @@ Installed by ``pip`` as a console script, and also runnable as
 that module's ``main()``. ``gtmkit sizing --spec m.json`` and
 ``python3 -m gtmkit.sizing --spec m.json`` are the same command; the front door
 adds no options of its own, so nothing can drift between the two spellings.
+It passes only the name to print in usage and errors, the command as typed:
+``gtmkit sizing``, or ``python3 -m gtmkit sizing``.
 """
 
 from __future__ import annotations
@@ -156,12 +158,12 @@ def _usage() -> str:
     return "\n".join(lines) + "\n"
 
 
-def _init(argv: Sequence[str]) -> int:
+def _init(argv: Sequence[str], prog: str = "gtmkit init") -> int:
     kinds = "\n".join(
         "  %-11s %s" % (kind, summary) for kind, _, summary, _ in STARTERS
     )
     parser = argparse.ArgumentParser(
-        prog="gtmkit init",
+        prog=prog,
         description=(
             "Print a starter spec to stdout, or write it with --out. Each "
             "starter is a complete worked example that validates as shipped; "
@@ -224,7 +226,8 @@ def _init(argv: Sequence[str]) -> int:
     return 0
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: str = "gtmkit") -> int:
+    """Run the front door. ``prog`` is how it was invoked, for usage lines."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] in ("-h", "--help", "help"):
         sys.stdout.write(_usage())
@@ -234,7 +237,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
     command, rest = args[0], args[1:]
     if command == "init":
-        return _init(rest)
+        return _init(rest, "%s init" % prog)
 
     names = [name for name, _, _ in ANALYSES]
     if command not in names:
@@ -252,7 +255,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     module = importlib.import_module("gtmkit.%s" % command)
-    result = module.main(rest)
+    result = module.main(rest, prog="%s %s" % (prog, command))
     return 0 if result is None else int(result)
 
 

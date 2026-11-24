@@ -1057,9 +1057,9 @@ def build(spec: Mapping[str, Any]) -> ValueCase:
 # -- CLI ------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.valuecase",
+        prog=prog or "python3 -m gtmkit.valuecase",
         description=(
             "Build an auditable business case from a declarative spec. "
             "Outputs a markdown brief, a self-contained HTML report to "

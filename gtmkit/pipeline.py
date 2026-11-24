@@ -1184,9 +1184,9 @@ def to_markdown(result: Mapping[str, Any]) -> str:
 # -- CLI -----------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.pipeline",
+        prog=prog or "python3 -m gtmkit.pipeline",
         description=(
             "Pipeline coverage, a weighted forecast with its spread, the "
             "commit view, and hygiene flags, from a pipeline export."

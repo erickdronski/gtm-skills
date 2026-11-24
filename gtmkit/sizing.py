@@ -379,9 +379,9 @@ def to_markdown(result: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.sizing",
+        prog=prog or "python3 -m gtmkit.sizing",
         description=("Size a market bottom-up and top-down, and reconcile the two."),
     )
     parser.add_argument("--spec", required=True, help="path to the sizing JSON spec")

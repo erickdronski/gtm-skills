@@ -1240,9 +1240,9 @@ def to_markdown(result: Mapping[str, Any]) -> str:
 # -- CLI -----------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.qualify",
+        prog=prog or "python3 -m gtmkit.qualify",
         description=(
             "Score one deal against MEDDPICC, keeping what is confirmed apart "
             "from what is only believed, and name the next thing to confirm."

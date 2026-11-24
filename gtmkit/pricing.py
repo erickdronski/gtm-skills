@@ -348,9 +348,9 @@ def to_markdown(result: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.pricing",
+        prog=prog or "python3 -m gtmkit.pricing",
         description=(
             "Van Westendorp price sensitivity from a CSV of survey responses."
         ),

@@ -103,7 +103,7 @@ class TestDispatch(unittest.TestCase):
                 mock.patch.object(module, "main", return_value=0) as fake,
             ):
                 self.assertEqual(run([name, *argv])[0], 0)
-                fake.assert_called_once_with(argv)
+                fake.assert_called_once_with(argv, prog="gtmkit %s" % name)
 
     def test_exit_code_comes_from_the_analysis(self):
         with mock.patch.object(valuecase, "main", return_value=2):
@@ -142,6 +142,46 @@ class TestDispatch(unittest.TestCase):
         result = run_module("-m", "gtmkit.valuecase", NORTHWIND, "--check")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(b"is valid", result.stdout)
+
+
+class TestUsageNames(unittest.TestCase):
+    """Usage and errors name the command the user typed, however they typed it."""
+
+    def test_help_names_the_front_door_command(self):
+        for name in ANALYSIS_NAMES:
+            with self.subTest(analysis=name):
+                code, out, _ = run([name, "--help"])
+                self.assertEqual(code, 0)
+                self.assertTrue(out.startswith("usage: gtmkit %s " % name), out)
+                self.assertNotIn("python3 -m", out.split("\n\n", 1)[0])
+
+    def test_a_usage_error_names_the_front_door_command(self):
+        code, _, err = run(["valuecase"])
+        self.assertEqual(code, 2)
+        self.assertTrue(err.startswith("usage: gtmkit valuecase "), err)
+        self.assertIn("gtmkit valuecase: error: the following arguments", err)
+        self.assertEqual(
+            run(["init", "--help"])[1].split(" [", 1)[0], "usage: gtmkit init"
+        )
+
+    def test_python_dash_m_gtmkit_names_itself(self):
+        for args in (("valuecase", "--help"), ("init", "--help")):
+            with self.subTest(args=args):
+                result = run_module("-m", "gtmkit", *args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(
+                    result.stdout.startswith(
+                        ("usage: python3 -m gtmkit %s " % args[0]).encode()
+                    ),
+                    result.stdout,
+                )
+
+    def test_a_module_run_directly_keeps_its_own_name(self):
+        result = run_module("-m", "gtmkit.valuecase", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(
+            result.stdout.startswith(b"usage: python3 -m gtmkit.valuecase ")
+        )
 
 
 class TestInit(unittest.TestCase):

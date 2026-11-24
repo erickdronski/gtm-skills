@@ -498,9 +498,9 @@ def load_records(path: str) -> List[Dict[str, Any]]:
         return list(csv.DictReader(handle))
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.scoring",
+        prog=prog or "python3 -m gtmkit.scoring",
         description=(
             "Score records against a weighted rubric, reporting both fit and "
             "how much of the score had real data behind it."

@@ -272,9 +272,9 @@ def to_markdown(result: Dict[str, Any], currency: str = "USD") -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.funnel",
+        prog=prog or "python3 -m gtmkit.funnel",
         description=(
             "Work backwards from a revenue target to the funnel volume and "
             "spend it requires."
