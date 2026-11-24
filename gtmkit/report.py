@@ -35,7 +35,13 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from . import __version__, finance
 from .fmt import currency_symbol, fmt_currency, fmt_multiple, fmt_pct, fmt_periods
-from .valuecase import FLOOR_FAILS, FLOOR_HOLDS, FLOOR_NOTE, NO_RANGE_NOTE
+from .valuecase import (
+    FLOOR_FAILS,
+    FLOOR_HOLDS,
+    FLOOR_NOTE,
+    NO_RANGE_NOTE,
+    PROVENANCE,
+)
 
 __all__ = [
     "Scale",
@@ -47,15 +53,6 @@ __all__ = [
 ]
 
 REPO_URL = "https://github.com/erickdronski/gtm-skills"
-
-# What the footer may truthfully say: the ledger, sources, notes and meta are
-# the spec's own words and numbers, so only the computed figures are the
-# library's.
-PROVENANCE = (
-    "Every computed figure above comes from the declared inputs through a "
-    "tested library; the inputs, sources and other text are reproduced from "
-    "the spec as written."
-)
 
 # Confidence is ordered, so the report gives it one hue: more evidence, more
 # ink. (level, plural for the evidence bar, singular for per-input charts)

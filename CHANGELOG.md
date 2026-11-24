@@ -46,6 +46,10 @@ renders as an HTML report to share.
   is not an object are spec errors too.
 - The markdown brief says how many attribution and sensitivity rows it leaves
   out after the first twelve.
+- The markdown brief's footer no longer says that no number in it was written
+  by hand: its ledger prints the spec's own inputs. It now makes the same
+  claim as the HTML report's footer, that the computed figures come from the
+  library and the inputs, sources and other text from the spec.
 
 ### Skills
 

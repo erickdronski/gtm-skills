@@ -867,6 +867,15 @@ class TestSharedWording(unittest.TestCase):
         no_range = validate_spec(edge_cases()["no sensitivity rows"]).to_markdown()
         self.assertIn(report.NO_RANGE_NOTE, no_range)
 
+    def test_footer_wording_matches_the_markdown(self):
+        """The markdown prints the same ledger of hand-typed inputs, so its
+        footer can claim no more than the report's."""
+        markdown = load_spec(EXAMPLE).to_markdown()
+        footer = markdown.rstrip().splitlines()[-1]
+        self.assertIn(report.PROVENANCE, footer)
+        self.assertNotIn("by hand", markdown)
+        self.assertIn("| 124,800 tickets ", markdown)
+
 
 class TestScale(unittest.TestCase):
     def test_reproduces_the_design_axes(self):
