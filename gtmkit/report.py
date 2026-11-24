@@ -37,7 +37,14 @@ from . import __version__, finance
 from .fmt import currency_symbol, fmt_currency, fmt_multiple, fmt_pct, fmt_periods
 from .valuecase import FLOOR_FAILS, FLOOR_HOLDS, FLOOR_NOTE, NO_RANGE_NOTE
 
-__all__ = ["Scale", "nice_scale", "render_value_case", "tick_label"]
+__all__ = [
+    "Scale",
+    "currency_step",
+    "nice_scale",
+    "render_value_case",
+    "tick_label",
+    "tornado_axis_width",
+]
 
 REPO_URL = "https://github.com/erickdronski/gtm-skills"
 
@@ -123,18 +130,24 @@ def nice_scale(
     values: Iterable[Optional[float]],
     include_zero: bool = False,
     max_intervals: int = 6,
+    min_span: float = 0.0,
 ) -> Scale:
     """The tightest clean axis that holds every finite value.
 
     Non-finite and missing values are ignored rather than allowed to turn the
     whole chart into NaN. A flat series is given a band around its value so
-    there is still an axis to draw.
+    there is still an axis to draw. ``min_span`` widens a narrower spread
+    evenly about its middle, so a tiny difference is not stretched to fill
+    the chart.
     """
     finite = [float(v) for v in values if v is not None and math.isfinite(v)]
     lo = min(finite) if finite else 0.0
     hi = max(finite) if finite else 0.0
     if include_zero:
         lo, hi = min(lo, 0.0), max(hi, 0.0)
+    if hi - lo < min_span:
+        middle = (lo + hi) / 2
+        lo, hi = middle - min_span / 2, middle + min_span / 2
     if hi == lo:
         pad = abs(lo) or 1.0
         lo, hi = lo - pad, hi + pad
@@ -188,6 +201,18 @@ def tick_label(value: float, exponent: int, currency: str = "USD") -> str:
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return "%s%s%s%s" % ("-" if value < 0 else "", symbol, text, suffix)
+
+
+def currency_step(value: float) -> float:
+    """The step :func:`fmt_currency` rounds ``value`` to.
+
+    $100 at $74.9k, $100k at $1.2M, a dollar below $1,000, a cent below $1.
+    """
+    magnitude = abs(value)
+    for power in (9, 6, 3):
+        if magnitude >= 10**power:
+            return 10.0 ** (power - 1)
+    return 1.0 if magnitude >= 1 else 0.01
 
 
 _NARROW = frozenset(" .,:;'!|il()[]-")
@@ -548,7 +573,12 @@ def _tornado(
     labels: Mapping[str, str],
 ) -> str:
     """One row per ranged input on one shared NPV axis, base line marked."""
-    scale = nice_scale([base] + [r[k] for r in rows for k in ("npv_low", "npv_high")])
+    values = [base] + [r[k] for r in rows for k in ("npv_low", "npv_high")]
+    # A bar must not stretch a difference the printed figures round away: the
+    # axis spans at least ten of the steps fmt_currency rounds to, so a swing
+    # of $2.50 on a -$74.9k base stays a sliver beside labels that agree.
+    rounding = max([currency_step(v) for v in values if _finite(v)] or [0.0])
+    scale = nice_scale(values, min_span=10 * rounding)
     frac = scale.fraction
     base_at = frac(base) if _finite(base) else 0.0
     tips: List[str] = []

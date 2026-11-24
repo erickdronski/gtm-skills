@@ -793,6 +793,24 @@ class TestEdgeCases(unittest.TestCase):
         self.assertNotIn("does not start at zero", northwind)
         self.assertIn('<i class="zero"', northwind)
 
+    def test_a_swing_the_figures_round_away_stays_a_sliver(self):
+        raw = spec()
+        raw["drivers"][0]["inputs"]["rate"].update(low=0.19999, high=0.20001)
+        case = validate_spec(raw)
+        base = case.summary()["npv"]
+        row = case.sensitivity()[0]
+        self.assertLess(abs(row["npv_high"] - row["npv_low"]), 5)
+        html = case.to_html()
+        widths = re.findall(
+            r'class="bar (?:below|above)" style="[^"]*width: ([\d.]+)%', html
+        )
+        self.assertEqual(len(widths), 2)
+        for width in widths:
+            self.assertLess(float(width), 1.0)
+        # The printed ends agree with the base, as the bars now do.
+        tips = re.findall(r'<span class="tip (?:lo|hi)"[^>]*>([^<]*)</span>', html)
+        self.assertEqual(set(tips), {valuecase.fmt_currency(base)})
+
     def test_the_last_period_is_always_named(self):
         html = render(edge_cases()["nine years"])
         for variant in ("wide", "narrow"):
@@ -864,6 +882,35 @@ class TestScale(unittest.TestCase):
         flat = report.nice_scale([0.0, 0.0], include_zero=True)
         self.assertEqual(flat.ticks[len(flat.ticks) // 2], 0.0)
         self.assertTrue(all(math.isfinite(t) for t in flat.ticks))
+
+    def test_min_span_widens_a_narrow_spread_about_its_middle(self):
+        values = [-74867.5, -74865.0]
+        tight = report.nice_scale(values)
+        self.assertLess(tight.hi - tight.lo, 10)
+        wide = report.nice_scale(values, min_span=1000)
+        self.assertGreaterEqual(wide.hi - wide.lo, 1000)
+        self.assertLessEqual(wide.lo, min(values))
+        self.assertGreaterEqual(wide.hi, max(values))
+        middle = (wide.lo + wide.hi) / 2
+        self.assertLess(abs(middle - sum(values) / 2), wide.step)
+        # A spread already wider than the minimum is left alone.
+        self.assertEqual(
+            report.nice_scale([-72800, 238700], min_span=1000).ticks,
+            report.nice_scale([-72800, 238700]).ticks,
+        )
+
+    def test_currency_step_is_what_fmt_currency_rounds_to(self):
+        for value in (74867, -74867, 1234567, 5e9, 512, 0.5, 999.4):
+            step = report.currency_step(value)
+            nearest = round(value / step) * step
+            with self.subTest(value=value):
+                self.assertEqual(
+                    valuecase.fmt_currency(nearest), valuecase.fmt_currency(value)
+                )
+                self.assertNotEqual(
+                    valuecase.fmt_currency(nearest + step),
+                    valuecase.fmt_currency(value),
+                )
 
     def test_tick_labels_carry_the_precision_the_step_needs(self):
         self.assertEqual(report.tick_label(1060000, 4), "$1.06M")
