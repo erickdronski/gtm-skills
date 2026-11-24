@@ -48,13 +48,14 @@ gtmkit = "gtmkit.cli:main"
 
 [tool.setuptools]
 # The engine only. skills/, examples/ and tests/ stay in the repository; the
-# starter specs `gtmkit init` prints ship as copies under gtmkit/templates/.
+# starter specs `gtmkit init` prints ship as copies under gtmkit/templates/,
+# and the MEDDPICC rubric `gtmkit qualify` reads as a copy under gtmkit/data/.
 packages = ["gtmkit"]
 # Data files are listed explicitly below rather than swept in from a manifest.
 include-package-data = false
 
 [tool.setuptools.package-data]
-gtmkit = ["templates/*.json"]
+gtmkit = ["templates/*.json", "data/*.json"]
 
 [tool.setuptools.dynamic]
 version = { attr = "gtmkit.__version__" }

@@ -108,6 +108,10 @@ jobs:
           gtmkit valuecase case.json --check
           gtmkit valuecase case.json --format html --out case.html
           grep -q '\$105\.2k' case.html
+          gtmkit init deal --out deal.json
+          gtmkit qualify deal.json
+          gtmkit init sizing --out market.json
+          gtmkit sizing --spec market.json
 
   lint-python:
     name: lint (ruff)

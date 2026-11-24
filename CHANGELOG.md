@@ -23,6 +23,9 @@ renders as an HTML report to share.
   `--out` and will not overwrite an existing file without `--force`. Each
   starter is a byte-for-byte copy of the shipped example; a test fails if one
   drifts.
+- The MEDDPICC rubric `gtmkit qualify` reads ships inside the package as well,
+  so the command each starter names next runs after a pip install. A clone or
+  the plugin still reads the skill's own copy; a test keeps the two identical.
 
 ### Engine
 
@@ -56,7 +59,8 @@ renders as an HTML report to share.
 - The README's quoted brief is checked line by line against the example's
   output, and its report screenshot for size.
 - 437 tests, up from 346. CI also builds the wheel, installs it, and runs the
-  installed `gtmkit` command and the HTML report outside the repository.
+  installed `gtmkit` command, every starter with the command it names, and the
+  HTML report outside the repository.
 
 ## [0.3.0] — 2026-11-20
 
