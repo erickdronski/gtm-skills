@@ -35,7 +35,7 @@ import json
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from .cli import emit
+from .cli import emit, open_input
 from .evidence import EvidenceError, validate_input
 from .fmt import fmt_count, fmt_currency, fmt_pct, table
 
@@ -390,7 +390,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
     args = parser.parse_args(argv)
 
     try:
-        with open(args.spec, "r", encoding="utf-8") as handle:
+        with open_input(args.spec, SizingError) as handle:
             spec = json.load(handle)
         result = size(spec)
     except FileNotFoundError:

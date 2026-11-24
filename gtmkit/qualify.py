@@ -42,7 +42,7 @@ import sys
 from importlib import resources
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from .cli import emit
+from .cli import emit, open_input
 from .evidence import MIN_SOURCE_CHARS, weasel_phrases
 from .fmt import fmt_currency, fmt_pct, table
 from .scoring import Rubric, RubricError, score_record
@@ -331,7 +331,7 @@ def load_rubric(path: Optional[str] = None) -> QualificationRubric:
     else:
         target = path
         try:
-            with open(target, "r", encoding="utf-8") as handle:
+            with open_input(target, QualifyError) as handle:
                 text = handle.read()
         except FileNotFoundError:
             raise QualifyError("no such rubric file: %s" % target)
@@ -1261,7 +1261,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
 
     try:
         rubric = load_rubric(args.rubric)
-        with open(args.deal, "r", encoding="utf-8") as handle:
+        with open_input(args.deal, QualifyError) as handle:
             spec = json.load(handle)
         as_of = _parse_date(args.as_of, "--as-of") if args.as_of else None
         result = qualify(spec, rubric, as_of)

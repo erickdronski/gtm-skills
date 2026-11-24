@@ -372,6 +372,114 @@ WRITERS = {
 }
 
 
+class TestUnreadableInput(unittest.TestCase):
+    """An input file that is not UTF-8, or not a file at all, is one line and
+    exit 2 in every analysis, as in valuecase, never a traceback."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def utf16(self, *parts):
+        """A copy of an example file as PowerShell 5's ``>`` writes it."""
+        target = os.path.join(self.tmp.name, "utf16-" + parts[-1])
+        with open(example(*parts), encoding="utf-8") as handle:
+            text = handle.read()
+        with open(target, "w", encoding="utf-16") as handle:
+            handle.write(text)
+        return target
+
+    def cases(self, bad):
+        """Each analysis's arguments with one input replaced by ``bad``(kind)."""
+        rubric = example("icp", "rubric.json")
+        accounts = example("icp", "accounts.csv")
+        stages = example("pipeline", "stages.json")
+        deals = example("pipeline", "pipeline.csv")
+        meddpicc = os.path.join(
+            REPO_ROOT, "skills", "deal-qualification", "assets", "meddpicc-rubric.json"
+        )
+        return {
+            "valuecase spec": [
+                "valuecase",
+                bad("value-case", "northwind-support-deflection.json"),
+            ],
+            "qualify deal": ["qualify", bad("deal", "kestrel-expansion.json")],
+            "qualify --rubric": [
+                "qualify",
+                example("deal", "kestrel-expansion.json"),
+                "--rubric",
+                bad(meddpicc),
+            ],
+            "sizing --spec": [
+                "sizing",
+                "--spec",
+                bad("sizing", "agent-observability-na.json"),
+            ],
+            "pricing --responses": [
+                "pricing",
+                "--responses",
+                bad("pricing", "responses.csv"),
+            ],
+            "scoring --rubric": [
+                "scoring",
+                "--rubric",
+                bad("icp", "rubric.json"),
+                "--records",
+                accounts,
+            ],
+            "scoring --records": [
+                "scoring",
+                "--rubric",
+                rubric,
+                "--records",
+                bad("icp", "accounts.csv"),
+            ],
+            "pipeline records": [
+                "pipeline",
+                bad("pipeline", "pipeline.csv"),
+                "--stages",
+                stages,
+            ],
+            "pipeline --stages": [
+                "pipeline",
+                deals,
+                "--stages",
+                bad("pipeline", "stages.json"),
+            ],
+        }
+
+    def assert_one_line(self, argv, expected):
+        code, out, err = run(argv)
+        self.assertEqual((code, out), (2, ""), err)
+        self.assertEqual(err.count("\n"), 1, err)
+        self.assertIn(expected, err)
+
+    def test_a_file_that_is_not_utf8(self):
+        def bad(*parts):
+            if len(parts) == 1:  # a path already
+                target = os.path.join(
+                    self.tmp.name, "utf16-" + os.path.basename(parts[0])
+                )
+                with open(parts[0], encoding="utf-8") as handle:
+                    text = handle.read()
+                with open(target, "w", encoding="utf-16") as handle:
+                    handle.write(text)
+                return target
+            return self.utf16(*parts)
+
+        for name, argv in self.cases(bad).items():
+            path = next(a for a in argv if os.path.basename(a).startswith("utf16-"))
+            with self.subTest(case=name):
+                self.assert_one_line(argv, "%s is not UTF-8 text" % path)
+
+    def test_a_directory(self):
+        folder = os.path.join(self.tmp.name, "a folder")
+        os.mkdir(folder)
+        for name, argv in self.cases(lambda *parts: folder).items():
+            with self.subTest(case=name):
+                self.assert_one_line(argv, "cannot read %s" % folder)
+
+
 class TestOut(unittest.TestCase):
     """Every --out reports a file it cannot write; none raises a traceback."""
 

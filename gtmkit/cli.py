@@ -19,17 +19,18 @@ It passes only the name to print in usage and errors, the command as typed:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import difflib
 import errno
 import importlib
 import os
 import sys
 from importlib import resources
-from typing import Optional, Sequence, Tuple
+from typing import Iterator, Optional, Sequence, TextIO, Tuple, Type
 
 from . import __version__
 
-__all__ = ["ANALYSES", "STARTERS", "emit", "main", "starter_bytes"]
+__all__ = ["ANALYSES", "STARTERS", "emit", "main", "open_input", "starter_bytes"]
 
 # (name, what it does, example arguments). The name is the module name, so
 # every entry also runs as ``python3 -m gtmkit.<name>``.
@@ -115,6 +116,33 @@ def emit(text: str, out: Optional[str]) -> int:
         return 1
     sys.stderr.write("wrote %s\n" % out)
     return 0
+
+
+@contextlib.contextmanager
+def open_input(
+    path: str,
+    error: Type[Exception],
+    encoding: str = "utf-8",
+    newline: Optional[str] = None,
+) -> Iterator[TextIO]:
+    """Open an analysis's input file as text, reporting one it cannot read.
+
+    A file that is not UTF-8 (PowerShell 5's ``>`` writes UTF-16), or is not a
+    file at all, such as a directory, raises the analysis's own ``error``
+    naming the path, while it is opened or read in the ``with`` block. Its
+    main() prints that as one line with exit status 2, as ``gtmkit
+    valuecase`` does, instead of a traceback. A missing file still raises
+    FileNotFoundError, for the caller to report in its own words.
+    """
+    try:
+        with open(path, encoding=encoding, newline=newline) as handle:
+            yield handle
+    except UnicodeDecodeError as exc:
+        raise error("%s is not UTF-8 text: %s" % (path, exc)) from exc
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        raise error("cannot read %s: %s" % (path, exc.strerror or exc)) from exc
 
 
 def starter_bytes(kind: str) -> bytes:

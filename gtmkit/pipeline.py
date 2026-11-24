@@ -38,7 +38,7 @@ import re
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from .cli import emit
+from .cli import emit, open_input
 from .evidence import EvidenceError, grade_evidence, validate_input
 from .fmt import fmt_currency, fmt_pct, table
 from .scoring import RubricError, load_records
@@ -1233,7 +1233,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
 
     try:
         if args.stages:
-            with open(args.stages, "r", encoding="utf-8") as handle:
+            with open_input(args.stages, PipelineError) as handle:
                 model = load_stage_model(json.load(handle))
         else:
             model = default_stage_model()

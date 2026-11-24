@@ -50,7 +50,7 @@ import json
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from .cli import emit
+from .cli import emit, open_input
 from .fmt import fmt_pct, table
 
 __all__ = ["Rubric", "RubricError", "main", "score_all", "score_record"]
@@ -484,7 +484,7 @@ def to_markdown(
 def load_records(path: str) -> List[Dict[str, Any]]:
     """Load records from CSV or JSON, inferring from the extension."""
     if path.lower().endswith(".json"):
-        with open(path, "r", encoding="utf-8") as handle:
+        with open_input(path, RubricError) as handle:
             data = json.load(handle)
         if isinstance(data, dict):
             data = data.get("records", [])
@@ -494,7 +494,7 @@ def load_records(path: str) -> List[Dict[str, Any]]:
                 "'records' array)" % path
             )
         return data
-    with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+    with open_input(path, RubricError, "utf-8-sig", "") as handle:
         return list(csv.DictReader(handle))
 
 
@@ -518,7 +518,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
     args = parser.parse_args(argv)
 
     try:
-        with open(args.rubric, "r", encoding="utf-8") as handle:
+        with open_input(args.rubric, RubricError) as handle:
             rubric = Rubric(json.load(handle))
         records = load_records(args.records)
     except FileNotFoundError as exc:

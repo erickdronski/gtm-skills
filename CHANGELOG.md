@@ -41,6 +41,9 @@ renders as an HTML report to share.
   identical bytes.
 - `--out` that cannot be written prints one line and exits 1 in every
   analysis, instead of a traceback.
+- An input file that is not UTF-8 (PowerShell 5's `>` writes UTF-16), or is a
+  directory, prints one line and exits 2 in every analysis, instead of a
+  traceback.
 - `gtmkit valuecase --check` builds the whole model, so a range bound that
   breaks a formula (a denominator whose low bound is 0) is a spec error before
   any output is written. An unreadable or non-UTF-8 spec file and a `meta` that

@@ -34,7 +34,7 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from .cli import emit
+from .cli import emit, open_input
 from .fmt import fmt_count, fmt_currency, table
 
 __all__ = ["PricingError", "analyze", "main"]
@@ -366,10 +366,13 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
     args = parser.parse_args(argv)
 
     try:
-        with open(args.responses, "r", encoding="utf-8-sig", newline="") as handle:
+        with open_input(args.responses, PricingError, "utf-8-sig", "") as handle:
             rows = list(csv.DictReader(handle))
     except FileNotFoundError:
         sys.stderr.write("no such file: %s\n" % args.responses)
+        return 2
+    except PricingError as exc:
+        sys.stderr.write("pricing error: %s\n" % exc)
         return 2
 
     if not rows:
