@@ -40,6 +40,7 @@ VOID = {
     "meta",
     "wbr",
 }
+LONG_SOURCE_URL = "https://dashboards.example.com/cx/q2/" + "y" * 120
 ALLOWED_TAGS = {
     "a", "b", "body", "circle", "code", "dd", "div", "dl", "dt", "figcaption",
     "figure", "footer", "h1", "h2", "h3", "head", "header", "html", "i", "li",
@@ -242,8 +243,8 @@ def edge_cases():
     long_text["drivers"][0]["inputs"]["volume"]["source"] = (
         "Warehouse export dated 2026-01-01, file "
         + "x" * 240
-        + " and https://dashboards.example.com/cx/q2/"
-        + "y" * 120
+        + " and "
+        + LONG_SOURCE_URL
     )
     long_text["costs"][0]["note"] = "Contract schedule " * 40
     cases["long labels and sources"] = long_text
@@ -833,10 +834,10 @@ class TestEscaping(unittest.TestCase):
         self.assertEqual(
             [a["href"] for _, a in doc.elements if "href" in a], [report.REPO_URL]
         )
-        for found in re.findall(r"https?://[^\s\"<>]+", html):
-            self.assertTrue(
-                found == report.REPO_URL or "dashboards.example.com" in found, found
-            )
+        self.assertEqual(
+            set(re.findall(r"https?://[^\s\"<>]+", html)),
+            {report.REPO_URL, LONG_SOURCE_URL},
+        )
 
 
 class TestEdgeCases(unittest.TestCase):
