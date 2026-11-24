@@ -340,6 +340,12 @@ def _headline(case: Any) -> str:
     rows = case.headline()
     (npv_label, npv_text), tiles, (_, safety) = rows[0], rows[1:-1], rows[-1]
     size = "" if len(npv_text) <= 8 else (" l2" if len(npv_text) <= 11 else " l3")
+    # The hero figure must stay on one line in any width its cell gets, a
+    # narrow window or a printed page included. Its estimated width in ems
+    # (less the -0.035em tracking) gives the largest font, in cqi of the cell,
+    # that still fits; CSS caps it at the design size.
+    ems = _text_width(npv_text, 1.0) - 0.035 * len(npv_text)
+    fit = math.floor(1000.0 / max(ems, 1.0)) / 10
     sub = "Base case, %d year%s at %s" % (
         case.horizon,
         "" if case.horizon == 1 else "s",
@@ -348,8 +354,9 @@ def _headline(case: Any) -> str:
     out = [
         '<section class="kpis" aria-label="Headline">\n',
         '<div class="kpi hero"><div class="label">%s</div>'
-        '<div class="value num%s">%s</div><div class="sub">%s</div></div>\n'
-        % (_e(npv_label), size, _e(npv_text), _e(sub)),
+        '<div class="value num%s" style="--fit: %s">%s</div>'
+        '<div class="sub">%s</div></div>\n'
+        % (_e(npv_label), size, fit, _e(npv_text), _e(sub)),
     ]
     for label, text in tiles:
         # A sentence such as "never within the modeled horizon" is the honest
@@ -1164,7 +1171,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; ov
 /* Headline: one hero figure, the rest are stat tiles. */
 .kpis { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 0; padding: 0; overflow: hidden; }
 .kpi { padding: 20px 22px 18px; border-left: 1px solid var(--border); border-top: 1px solid var(--border); min-width: 0; }
-.kpi.hero { grid-row: 1 / span 2; border-left: 0; border-top: 0; display: flex; flex-direction: column; justify-content: center; padding: 26px 26px 24px; }
+.kpi.hero { grid-row: 1 / span 2; border-left: 0; border-top: 0; display: flex; flex-direction: column; justify-content: center; padding: 26px 26px 24px; container-type: inline-size; }
 .kpi:nth-child(2), .kpi:nth-child(3) { border-top: 0; }
 .kpi .label { font-size: 12.5px; color: var(--ink-2); }
 .kpi .value { font-size: 25px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.15; margin-top: 6px; overflow-wrap: anywhere; }
@@ -1172,6 +1179,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; ov
 .kpi.hero .value { font-size: 60px; letter-spacing: -0.035em; line-height: 1; margin-top: 10px; }
 .kpi.hero .value.l2 { font-size: 46px; }
 .kpi.hero .value.l3 { font-size: 34px; }
+/* Where container units work, the hero figure shrinks with its cell (--fit is
+   set from its length) rather than break mid-number; elsewhere the sizes above. */
+@supports (width: 1cqi) {
+  .kpi.hero .value.num { font-size: min(60px, calc(var(--fit) * 1cqi)); }
+}
 .kpi .sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
 .safety { margin: 14px 2px 0; color: var(--ink-2); }
 .safety b { color: var(--ink); font-weight: 600; }
@@ -1317,6 +1329,11 @@ footer a { color: inherit; }
 %(compact)s}
 @media screen and (max-width: 560px) {
 %(cards)s}
+@supports (width: 1cqi) {
+  @media screen and (max-width: 760px) {
+    .kpi.hero .value.num { font-size: min(44px, calc(var(--fit) * 1cqi)); }
+  }
+}
 @media print {
   :root { color-scheme: light; --page: #fff; --surface: #fff; --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6d68; --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,.14); --wash: rgba(11,11,11,.035); --fact: #104281; --inference: #2a78d6; --assumption: #86b6ef; --on-fact: #fff; --on-inference: #fff; --on-assumption: #0b0b0b; --above: #2a78d6; --below: #e34948; --critical: #d03b3b; }
   body { font-size: 11pt; }

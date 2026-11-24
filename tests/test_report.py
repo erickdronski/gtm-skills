@@ -151,7 +151,7 @@ def markdown_headline(markdown):
 
 def html_headline(html):
     tiles = re.findall(
-        r'<div class="label">(.*?)</div><div class="value[^"]*">(.*?)</div>', html
+        r'<div class="label">(.*?)</div><div class="value[^"]*"[^>]*>(.*?)</div>', html
     )
     values = {unescape(label): unescape(value) for label, value in tiles}
     safety = re.search(r'<p class="safety"><b>Margin of safety:</b> (.*?)</p>', html)
@@ -625,8 +625,23 @@ class TestEdgeCases(unittest.TestCase):
         self.assertIn("a minus sign marks value it takes away", html)
 
     def test_long_values_shrink_the_hero_figure(self):
-        html = render(edge_cases()["very large values"])
-        self.assertRegex(html, r'class="value num( l2| l3)?">-?\$[\d.,]+[kMB]?<')
+        def hero(html):
+            found = re.search(
+                r'<div class="value num( l2| l3)?" style="--fit: ([\d.]+)">([^<]+)<',
+                html,
+            )
+            return found.group(1), float(found.group(2)), unescape(found.group(3))
+
+        _, short_fit, short = hero(load_spec(EXAMPLE).to_html())
+        for name in ("very large values", "currency code"):
+            with self.subTest(case=name):
+                _, fit, text = hero(render(edge_cases()[name]))
+                self.assertLess(fit, short_fit, (text, short))
+                # At --fit cqi the estimated width of the figure, with the
+                # -0.035em tracking, fills no more than its cell.
+                ems = report._text_width(text, 1.0) - 0.035 * len(text)
+                self.assertLessEqual(fit * ems, 100.0)
+        self.assertIn("@supports (width: 1cqi)", load_spec(EXAMPLE).to_html())
 
     def test_zero_benefit_has_nothing_to_grade(self):
         raw = edge_cases()["zero benefit"]
