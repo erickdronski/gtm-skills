@@ -213,19 +213,39 @@ failure modes.
 
 **Separate fit from evidence coverage.** Missing information should not be
 interpreted as poor fit. The scorer reports both measures and holds
-under-researched records out of the ranking:
+under-researched records out of the ranking. Scoring the ICP example,
 
-```
-| Record          | Tier    | Fit  | Coverage | Notes                                       |
-|-----------------|---------|------|----------|---------------------------------------------|
-| Northwind       | A       | 100% | 100%     | Fully covered.                              |
-| Boreal Retail   | B       | 66%  | 100%     | Fully covered.                              |
-| Halden Freight  | UNKNOWN | 83%  | 50%      | Not a low-fit record, an unresearched one.  |
-| Marisol Shipping| OUT     | —    | 100%     | Below the volume where deflection pays back |
+```bash
+python3 -m gtmkit.scoring --rubric examples/icp/rubric.json \
+  --records examples/icp/accounts.csv
 ```
 
-Halden scores 83% and is still held back. Ranking it above a fully-diligenced
-peer would be comparing a measurement to a guess.
+prints this, shown with its Notes column left out and long lines wrapped:
+
+```
+7 record(s) scored against 5 criteria. 2 disqualified, 4 ranked, 1 held back
+as insufficiently researched.
+
+| Record                | Tier    | Fit  | Coverage |
+|-----------------------|---------|------|----------|
+| Northwind Logistics   | A       | 100% | 100%     |
+| Kestrel Distribution  | A       | 87%  | 100%     |
+| Boreal Retail Group   | B       | 66%  | 100%     |
+| Tinsley Manufacturing | D       | 40%  | 100%     |
+| Halden Freight        | UNKNOWN | 83%  | 50%      |
+| Marisol Shipping      | OUT     | —    | 100%     |
+| Pacific Rim Cargo     | OUT     | —    | 100%     |
+
+## Research these before ranking them
+
+These records fell below 60% data coverage. Ranking them against
+fully-researched peers would be comparing a measurement to a guess.
+
+- **Halden Freight** — missing Monthly ticket volume, Named exec sponsor
+```
+
+Halden scores 83% and is still held back: half of its scoring weight has no
+data behind it yet.
 
 Deal qualification applies the same idea one level down. A CRM field records
 what the rep believes; the deal engine also records how anyone knows it —

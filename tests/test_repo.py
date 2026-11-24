@@ -383,6 +383,35 @@ class TestReadmeStaysHonest(unittest.TestCase):
         width = int.from_bytes(header[16:20], "big")
         self.assertTrue(1100 <= width <= 1300, "screenshot is %dpx wide" % width)
 
+    def test_quoted_icp_table_is_the_scorer_output(self):
+        """The ICP excerpt is the example's output: every row, in order, with
+        only the Notes column left out and long lines wrapped. It used to be
+        a paraphrase with shortened names, rewritten notes and three rows
+        missing."""
+        with open(
+            os.path.join(EXAMPLES, "icp", "rubric.json"), encoding="utf-8"
+        ) as handle:
+            rubric = scoring.Rubric(json.load(handle))
+        records = scoring.load_records(os.path.join(EXAMPLES, "icp", "accounts.csv"))
+        markdown = scoring.to_markdown(
+            rubric, scoring.score_all(rubric, records), "name"
+        )
+        start = self.readme.index("| Record ")
+        fence = self.readme.rindex("```\n", 0, start)
+        excerpt = self.readme[fence + 4 : self.readme.index("```", start)]
+        lines = [line for line in excerpt.splitlines() if line.strip()]
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertIn(line, markdown)
+        quoted = [line for line in lines if line.startswith("|")]
+        produced = [line for line in markdown.splitlines() if line.startswith("|")]
+        self.assertEqual(len(quoted), len(produced), "a row is missing")
+        for row, full in zip(quoted, produced):
+            self.assertTrue(full.startswith(row), (row, full))
+            self.assertEqual(row.count("|"), 5, "Record, Tier, Fit, Coverage")
+        self.assertIn("Notes column left out", self.readme[:fence])
+        self.assertIn("## Research these before ranking them", excerpt)
+
     def test_quoted_qualification_verdict_matches_the_example(self):
         """Every line of the README's verdict excerpt must still be generated."""
         with open(
