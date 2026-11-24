@@ -11,6 +11,7 @@ import contextlib
 import errno
 import importlib
 import io
+import json
 import os
 import subprocess
 import sys
@@ -115,6 +116,50 @@ class TestDispatch(unittest.TestCase):
         code, out, _ = run(["valuecase", NORTHWIND, "--check"])
         self.assertEqual(code, 0)
         self.assertIn("is valid: 3 driver(s), 3 cost line(s)", out)
+
+    def test_funnel_exit_codes_track_verified_feasibility(self):
+        args = [
+            "funnel",
+            "--target-revenue",
+            "10000",
+            "--acv",
+            "1000",
+            "--stage",
+            "lead:0.5",
+            "--format",
+            "json",
+        ]
+        for ceiling, expected_code, feasible in (
+            ([], 0, None),
+            (["--audience-ceiling", "20"], 0, True),
+            (["--audience-ceiling", "0"], 1, False),
+        ):
+            with self.subTest(ceiling=ceiling):
+                code, out, err = run(args + ceiling)
+                self.assertEqual((code, err), (expected_code, ""))
+                self.assertIs(json.loads(out)["feasible"], feasible)
+
+    def test_invalid_funnel_cost_flags_exit_before_printing_a_plan(self):
+        args = [
+            "funnel",
+            "--target-revenue",
+            "10000",
+            "--acv",
+            "1000",
+            "--stage",
+            "lead:0.5",
+        ]
+        for option, value in (
+            ("--cost-per-unit", "-2"),
+            ("--cpm", "-2"),
+            ("--cpm", "nan"),
+            ("--audience-ceiling", "-1"),
+        ):
+            with self.subTest(option=option, value=value):
+                code, out, err = run([*args, option, value])
+                self.assertEqual((code, out), (2, ""))
+                self.assertIn("nonnegative", err)
+                self.assertNotIn("Traceback", err)
 
     def test_analysis_usage_errors_keep_their_exit_code(self):
         self.assertEqual(run(["sizing", "--no-such-flag"])[0], 2)

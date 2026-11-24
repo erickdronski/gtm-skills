@@ -80,8 +80,10 @@ Each `--stage` is `name:rate`, where the rate is the probability of moving to
 the *next* stage. The final stage converts to closed-won, or to
 `--win-rate` if you model the close separately.
 
-The command exits non-zero when the plan exceeds the audience ceiling, so it can
-gate a CI check or a planning script.
+For a planning gate, supply a real audience ceiling. The command exits 0 when
+the required volume fits, 1 when the ceiling is exceeded (including a zero
+audience), and 2 for invalid inputs such as negative costs. Without a ceiling,
+the report is unverified, JSON `feasible` is `null`, and the command exits 0.
 
 ### 4. Stress the plan before presenting it
 

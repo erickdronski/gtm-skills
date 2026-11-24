@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-11-24
+
+- A funnel with zero reachable audience reports the positive target as unreachable
+  and exits 1. Invalid costs, ceilings, or conversion rates produce an input
+  error. A zero unit cost keeps its cost stage and reports zero spend and CAC.
+- **JSON and Python API correction.** Without a supplied audience ceiling,
+  `feasible` is now `null` (Python `None`), previously `true`. For a
+  pass/fail gate, supply an audience ceiling and test for an explicit `true`.
+  The CLI still exits 0 for a valid unverified plan. Library results now include
+  the ceiling used in the calculation so their Markdown renders the same verdict.
+
 ## [0.4.0] — 2026-11-24
 
 The engine installs with pip behind one `gtmkit` command, and a value case

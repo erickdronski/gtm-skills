@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -54,12 +55,16 @@ def parse_stage(text: str) -> Stage:
         rate = float(raw_rate)
     except ValueError:
         raise FunnelError("stage %r has a non-numeric rate %r" % (text, raw_rate))
-    if not (0 < rate <= 1):
+    _validate_rate(name, rate)
+    return Stage(name, rate)
+
+
+def _validate_rate(name: str, rate: float) -> None:
+    if not 0 < rate <= 1:
         raise FunnelError(
             "stage %r has rate %r; conversion rates are decimals above 0 and "
             "at most 1 (25%% is 0.25, not 25)" % (name, rate)
         )
-    return Stage(name, rate)
 
 
 def plan(
@@ -83,10 +88,14 @@ def plan(
     funnel can be described in terms of opportunity creation and have the
     close step modeled separately — which is how most teams actually track it.
     """
-    if acv <= 0:
-        raise FunnelError("acv must be positive")
-    if target_revenue <= 0:
-        raise FunnelError("target_revenue must be positive")
+    if not 0 < acv < math.inf:
+        raise FunnelError("acv must be positive and finite")
+    if not 0 < target_revenue < math.inf:
+        raise FunnelError("target_revenue must be positive and finite")
+    if cost_per_unit is not None and not 0 <= cost_per_unit < math.inf:
+        raise FunnelError("cost_per_unit must be finite and nonnegative")
+    if audience_ceiling is not None and not 0 <= audience_ceiling < math.inf:
+        raise FunnelError("audience_ceiling must be finite and nonnegative")
     if not stages:
         raise FunnelError(
             "define at least one stage; a funnel with no stages is just a wish"
@@ -95,13 +104,20 @@ def plan(
         raise FunnelError("win_rate must be above 0 and at most 1")
 
     deals_needed = target_revenue / acv
+    if not 0 < deals_needed < math.inf:
+        raise FunnelError("target_revenue / acv is outside the supported numeric range")
 
     # Walk backwards. Each stage's required volume is the next stage's volume
     # divided by this stage's conversion rate.
     required: List[Tuple[str, float]] = []
     downstream = deals_needed / win_rate
     for stage in reversed(stages):
+        _validate_rate(stage.name, stage.rate)
         volume = downstream / stage.rate
+        if not math.isfinite(volume):
+            raise FunnelError(
+                "required volume at stage %r exceeds the numeric range" % stage.name
+            )
         required.append((stage.name, volume))
         downstream = volume
     required.reverse()
@@ -126,13 +142,22 @@ def plan(
             )
         cost_stage_volume = matches[0]
         spend = cost_stage_volume * cost_per_unit
-        cac = spend / deals_needed if deals_needed else None
+        cac = spend / deals_needed
+        if not math.isfinite(spend) or not math.isfinite(cac):
+            raise FunnelError(
+                "the resulting spend or acquisition cost exceeds the numeric range"
+            )
 
-    feasible = True
+    feasible = None
     ceiling_note = None
     if audience_ceiling is not None:
         feasible = top_volume <= audience_ceiling
-        if not feasible:
+        if audience_ceiling == 0:
+            ceiling_note = (
+                "This plan needs %s at the %s stage. The stated audience is zero."
+                % (fmt_count(top_volume), top_stage_name)
+            )
+        elif not feasible:
             ceiling_note = (
                 "This plan requires %s at the %s stage against an addressable "
                 "ceiling of %s — it needs %.1fx the audience that exists. The "
@@ -164,7 +189,8 @@ def plan(
         "top_of_funnel_stage": top_stage_name,
         "top_of_funnel_volume": top_volume,
         "cost_per_unit": cost_per_unit,
-        "cost_stage": cost_stage or (top_stage_name if cost_per_unit else None),
+        "cost_stage": cost_stage
+        or (top_stage_name if cost_per_unit is not None else None),
         "cost_stage_volume": cost_stage_volume,
         "spend": spend,
         "cac": cac,
@@ -183,6 +209,7 @@ def plan(
             if sales_cycle_days
             else None
         ),
+        "audience_ceiling": audience_ceiling,
         "feasible": feasible,
         "ceiling_note": ceiling_note,
     }
@@ -254,15 +281,15 @@ def to_markdown(result: Dict[str, Any], currency: str = "USD") -> str:
     lines.append("")
     if result["ceiling_note"]:
         lines.append("**Not reachable as specified.** %s" % result["ceiling_note"])
-    elif result["feasible"]:
+    elif result.get("audience_ceiling") is None:
         lines.append(
             "No audience ceiling was supplied, so feasibility is unverified. "
             "Add `--audience-ceiling` with the real size of the reachable "
             "segment — a plan that requires more audience than exists is the "
             "most common way a credible-looking campaign fails."
-            if result.get("audience_ceiling") is None
-            else "The plan fits within the stated addressable audience."
         )
+    else:
+        lines.append("The plan fits within the stated addressable audience.")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -314,6 +341,9 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         if cost_per_unit is not None:
             sys.stderr.write("use either --cpm or --cost-per-unit, not both\n")
             return 2
+        if not 0 <= args.cpm < math.inf:
+            sys.stderr.write("funnel error: cpm must be finite and nonnegative\n")
+            return 2
         cost_per_unit = args.cpm / 1000.0
 
     try:
@@ -332,12 +362,11 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         sys.stderr.write("funnel error: %s\n" % exc)
         return 2
 
-    result["audience_ceiling"] = args.audience_ceiling
     if args.format == "json":
         sys.stdout.write(json.dumps(result, indent=2) + "\n")
     else:
         sys.stdout.write(to_markdown(result, args.currency) + "\n")
-    return 0 if result["feasible"] else 1
+    return 1 if result["feasible"] is False else 0
 
 
 if __name__ == "__main__":  # pragma: no cover
