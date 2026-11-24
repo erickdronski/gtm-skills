@@ -778,9 +778,13 @@ def _margin_of_safety(summary: Mapping[str, Any]) -> str:
     if multiplier <= 0:
         return "case clears zero even with no benefits at all"
     if multiplier < 1:
-        return "benefits can come in %s below plan and still break even" % fmt_pct(
-            1 - multiplier
-        )
+        share = fmt_pct(1 - multiplier)
+        if share == "100%":
+            # 100% below plan is no benefit at all, which leaves any cost
+            # unpaid. A margin of 99.5% rounds up to that, so it is cut down
+            # to a tenth of a point instead: 99.5%, and never past 99.9%.
+            share = fmt_pct(min(math.floor((1 - multiplier) * 1000), 999) / 1000, 1)
+        return "benefits can come in %s below plan and still break even" % share
     return "none — benefits must exceed plan by %s just to break even" % fmt_pct(
         multiplier - 1
     )

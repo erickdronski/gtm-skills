@@ -51,6 +51,8 @@ renders as an HTML report to share.
   claim as the HTML report's footer, that the computed figures come from the
   library and the inputs, sources and other text from the spec, with numbers
   rounded for display.
+- The margin of safety never rounds up to 100%, which would say benefits
+  could fall to nothing: a case that breaks even 99.5% below plan says 99.5%.
 
 ### Skills
 

@@ -65,6 +65,37 @@ def minimal_spec(**overrides):
     return spec
 
 
+def one_year_spec(cost, b=None):
+    """A year at 0%: benefit a * b = 1000 in year 1 against ``cost`` today."""
+    return {
+        "name": "One-year case",
+        "horizon_years": 1,
+        "discount_rate_annual": 0,
+        "drivers": [
+            {
+                "id": "d1",
+                "label": "Driver one",
+                "formula": "a * b",
+                "inputs": {
+                    "a": {
+                        "value": 1000,
+                        "confidence": "fact",
+                        "source": "Warehouse export dated 2026-01-01",
+                    },
+                    "b": b
+                    or {
+                        "value": 1,
+                        "confidence": "fact",
+                        "source": "Contract schedule signed 2026-02-01",
+                    },
+                },
+                "realization": 1.0,
+            }
+        ],
+        "costs": [{"id": "c", "label": "Cost", "schedule": [cost, 0]}],
+    }
+
+
 class TestCashFlows(unittest.TestCase):
     def setUp(self):
         self.case = validate_spec(minimal_spec())
@@ -442,6 +473,38 @@ class TestCommandLineErrors(unittest.TestCase):
             with contextlib.redirect_stderr(err):
                 self.assertEqual(valuecase.main([tmp, "--check"]), 2)
             self.assertIn("spec error: cannot read", err.getvalue())
+
+
+class TestMarginOfSafety(unittest.TestCase):
+    """The headline's margin sentence must stay true after rounding."""
+
+    def margin(self, cost):
+        case = validate_spec(one_year_spec(cost))
+        return dict(case.headline())["Margin of safety"]
+
+    def test_any_cost_keeps_the_margin_under_100_percent(self):
+        """At 100% below plan there is no benefit and NPV is minus the cost,
+        so 99.5% must not round up to 100%."""
+        expected = {
+            5: "99.5%",
+            4: "99.6%",
+            1: "99.9%",
+            1e-12: "99.9%",
+            1e-20: "99.9%",
+            6: "99%",
+            170: "83%",
+        }
+        for cost, share in expected.items():
+            with self.subTest(cost=cost):
+                self.assertEqual(
+                    self.margin(cost),
+                    "benefits can come in %s below plan and still break even" % share,
+                )
+
+    def test_no_cost_at_all_keeps_its_own_wording(self):
+        self.assertEqual(
+            self.margin(0), "case clears zero even with no benefits at all"
+        )
 
 
 class TestShippedExample(unittest.TestCase):
