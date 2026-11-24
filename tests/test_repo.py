@@ -458,6 +458,28 @@ class TestReadmeStaysHonest(unittest.TestCase):
         )
 
 
+class TestSecurityPolicy(unittest.TestCase):
+    """SECURITY.md names everything an untrusted spec can reach."""
+
+    def setUp(self):
+        with open(os.path.join(REPO_ROOT, "SECURITY.md"), encoding="utf-8") as handle:
+            self.policy = handle.read()
+
+    def test_the_html_report_is_in_scope(self):
+        """The report renders spec strings into a file meant to be forwarded;
+        a reporter must not read it as out of scope."""
+        self.assertIn("**The HTML report.**", self.policy)
+        self.assertIn("--format html", self.policy)
+        self.assertIn("`TestEscaping` in `tests/test_report.py`", self.policy)
+        from tests import test_report
+
+        self.assertTrue(issubclass(test_report.TestEscaping, unittest.TestCase))
+
+    def test_formula_evaluation_is_still_in_scope(self):
+        self.assertIn("**Formula evaluation.**", self.policy)
+        self.assertIn("`tests/test_expr.py`", self.policy)
+
+
 class TestPluginManifests(unittest.TestCase):
     def test_plugin_json_is_valid(self):
         path = os.path.join(REPO_ROOT, ".claude-plugin", "plugin.json")
