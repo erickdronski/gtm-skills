@@ -159,6 +159,26 @@ def html_headline(html):
     return values
 
 
+def axis_labels(html):
+    """(place along the axis, 0 to 1; text; shown on a phone) per tick label."""
+    axis = html.split('<div class="t-axis">', 1)[1].split("</div>", 1)[0]
+    return [
+        (float(left) / 100, unescape(text), cls == "")
+        for cls, left, text in re.findall(
+            r'<span(?: class="([^"]*)")? style="left: ([\d.]+)%">([^<]*)</span>', axis
+        )
+    ]
+
+
+def wide_northwind(**changes):
+    """The example with a wider deflection range: six ticks on its axis."""
+    with open(EXAMPLE, encoding="utf-8") as handle:
+        raw = json.load(handle)
+    raw["shared_inputs"]["deflection_rate"]["high"] = 0.3
+    raw.update(changes)
+    return raw
+
+
 def edge_cases():
     """Specs for every shape the report must survive, by name."""
     cases = {}
@@ -529,6 +549,102 @@ class TestGeometry(unittest.TestCase):
         self.assertEqual(len(dots), len(running))
         for cy, value in zip(dots, running):
             self.assertAlmostEqual(cy, zero - value * ppu, delta=0.2)
+
+
+class TestAxisLabels(unittest.TestCase):
+    """Tick labels never run into each other, on a 320px phone or a desktop."""
+
+    def assert_clear(self, labels, width):
+        placed = sorted(
+            (at * width, report._text_width(text, report.AXIS_FONT))
+            for at, text, _ in labels
+        )
+        for (a, wa), (b, wb) in zip(placed, placed[1:]):
+            self.assertGreaterEqual(b - a - (wa + wb) / 2, report.AXIS_GAP)
+
+    def check(self, html):
+        tip = int(re.search(r'style="--tip: (\d+)px"', html).group(1))
+        labels = axis_labels(html)
+        phone = [label for label in labels if label[2]]
+        self.assertTrue(phone, "a phone must keep at least one label")
+        self.assert_clear(labels, report.tornado_axis_width("wide", tip))
+        self.assert_clear(phone, report.tornado_axis_width("phone", tip))
+        # A tick a phone leaves unlabelled loses its gridline there too.
+        tornado = html.split('class="tornado"', 1)[1].split("</figure>", 1)[0]
+        self.assertEqual(
+            tornado.count('<i class="wide"'), sum(1 for label in labels if not label[2])
+        )
+        # When the axis has zero, a phone always labels it and keeps its line.
+        zero = re.search(r'<i class="zero" style="left: ([\d.]+)%"', tornado)
+        if zero:
+            at = float(zero.group(1)) / 100
+            self.assertIn((at, True), [(place, shown) for place, _, shown in labels])
+        return labels
+
+    def test_a_six_tick_axis_thins_on_a_phone(self):
+        labels = self.check(render(wide_northwind()))
+        self.assertEqual(
+            [text for _, text, _ in labels],
+            ["-$100k", "$0", "$100k", "$200k", "$300k", "$400k"],
+        )
+        self.assertEqual([text for _, text, shown in labels if shown], ["$0", "$300k"])
+
+    def test_the_example_keeps_every_label_wide_and_half_on_a_phone(self):
+        labels = self.check(load_spec(EXAMPLE).to_html())
+        self.assertEqual(
+            [(text, shown) for _, text, shown in labels],
+            [("-$100k", False), ("$0", True), ("$100k", False), ("$200k", True)],
+        )
+
+    def test_long_labels_thin_the_wide_axis_too(self):
+        labels = self.check(render(wide_northwind(currency="CHF")))
+        self.assertEqual(
+            [text for _, text, _ in labels], ["CHF 0", "CHF 200k", "CHF 400k"]
+        )
+
+    def test_every_edge_case_keeps_its_labels_apart(self):
+        for name, raw in edge_cases().items():
+            html = render(raw)
+            if 'class="t-axis"' in html:
+                with self.subTest(case=name):
+                    self.check(html)
+
+    def test_phone_rules_hide_the_thinned_ticks(self):
+        phone = report.CSS.split("@media screen and (max-width: 760px) {", 1)[1]
+        phone = phone.split("\n}\n", 1)[0]
+        self.assertIn(".t-axis span.wide, .t-lines i.wide { display: none; }", phone)
+
+    def test_axis_geometry_matches_the_stylesheet(self):
+        css = report.CSS
+        phone = css.split("@media screen and (max-width: 760px) {", 1)[1]
+        self.assertEqual(report.WIDE_MIN_WINDOW, 761)
+        self.assertIn(
+            ".report { max-width: 980px; margin: 0 auto; padding: 40px %dpx 56px; }"
+            % report._PAGE_PAD["wide"],
+            css,
+        )
+        self.assertIn(
+            "section { background: var(--surface); border: %dpx solid var(--border); "
+            "border-radius: 12px; padding: 24px %dpx;"
+            % (report._SECTION_BORDER, report._SECTION_PAD["wide"]),
+            css,
+        )
+        self.assertIn(
+            ".tornado { --label: %d%%; --tip: 0px; --gut: max(%dpx, var(--tip));"
+            % (100 * report._NAME_COLUMN["wide"], report._MIN_GUTTER["wide"]),
+            css,
+        )
+        self.assertIn(
+            ".report { padding: 24px %dpx 40px; }" % report._PAGE_PAD["phone"], phone
+        )
+        self.assertIn(
+            "section { padding: 18px %dpx; }" % report._SECTION_PAD["phone"], phone
+        )
+        self.assertIn(
+            ".tornado { --label: %d%%; --gut: max(%dpx, var(--tip)); }"
+            % (100 * report._NAME_COLUMN["phone"], report._MIN_GUTTER["phone"]),
+            phone,
+        )
 
 
 class TestEscaping(unittest.TestCase):

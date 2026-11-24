@@ -64,6 +64,22 @@ THIN_SEGMENT = 0.12
 PHONE_CONTENT_WIDTH = 313.0
 PHONE_CELL_PADDING = 24.0
 
+# The tornado's axis is at its narrowest in the narrowest window each layout
+# serves: 320px for the phone layout and 761px for the wide one. These mirror
+# the stylesheet: page padding, section padding and border, the name column,
+# and the least each gutter beside the plot takes (--gut). A test holds them
+# to the CSS.
+PHONE_MIN_WINDOW = 320.0
+WIDE_MIN_WINDOW = 761.0
+_PAGE_PAD = {"phone": 14.0, "wide": 28.0}
+_SECTION_PAD = {"phone": 16.0, "wide": 26.0}
+_SECTION_BORDER = 1.0
+_NAME_COLUMN = {"phone": 0.0, "wide": 0.34}
+_MIN_GUTTER = {"phone": 58.0, "wide": 70.0}
+# Axis labels are 12px; neighbours keep at least this much clear space.
+AXIS_FONT = 12.0
+AXIS_GAP = 8.0
+
 
 # -- scales and labels ----------------------------------------------------
 
@@ -219,6 +235,12 @@ def _e(value: Any) -> str:
 
 def _finite(value: Any) -> bool:
     return isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _class_attr(*names: str) -> str:
+    """A ``class`` attribute for the non-empty ``names``, or nothing."""
+    joined = " ".join(name for name in names if name)
+    return ' class="%s"' % joined if joined else ""
 
 
 class _Money:
@@ -496,6 +518,29 @@ def _sensitivity(
     return "".join(out)
 
 
+def tornado_axis_width(layout: str, tip: int) -> float:
+    """The tornado axis in px at the narrowest window ``layout`` serves.
+
+    ``layout`` is "phone" or "wide"; ``tip`` is the chart's --tip gutter in px.
+    """
+    window = PHONE_MIN_WINDOW if layout == "phone" else WIDE_MIN_WINDOW
+    content = window - 2 * (_PAGE_PAD[layout] + _SECTION_PAD[layout] + _SECTION_BORDER)
+    gutter = max(_MIN_GUTTER[layout], float(tip))
+    return content * (1 - _NAME_COLUMN[layout]) - 2 * gutter
+
+
+def _label_stride(widest: float, step_px: float, count: int, every: int = 1) -> int:
+    """How many ticks apart axis labels must sit so neighbours never touch.
+
+    The smallest multiple of ``every`` whose spacing clears the widest label
+    plus AXIS_GAP. ``count`` or more leaves a single label.
+    """
+    stride = every
+    while stride < count and stride * step_px < widest + AXIS_GAP:
+        stride += every
+    return stride
+
+
 def _tornado(
     rows: Sequence[Mapping[str, Any]],
     base: float,
@@ -597,6 +642,24 @@ def _tornado(
     # The gutters either side of the plot must hold the widest end label: a
     # bar can end at either edge of the axis, and its label sits outside it.
     gutter = max([_text_width(t, 12.5) for t in tips] or [0.0]) + 14
+    tip = math.ceil(gutter)
+    # Label every k-th tick, counted from zero when the axis has it, with k as
+    # small as the narrowest window of each layout allows. A phone labels a
+    # subset of the ticks a wide window labels, and hides the other gridlines.
+    widest = max(_text_width(text, AXIS_FONT) for _, text in ticks)
+    values = [t for t, _ in ticks]
+    start = values.index(0.0) if 0.0 in values else 0
+    step_px = {
+        layout: tornado_axis_width(layout, tip) * scale.step / (scale.hi - scale.lo)
+        for layout in ("wide", "phone")
+    }
+    every = _label_stride(widest, step_px["wide"], len(ticks))
+    every_phone = _label_stride(widest, step_px["phone"], len(ticks), every)
+    shown = [
+        (t, text, (i - start) % every_phone == 0)
+        for i, (t, text) in enumerate(ticks)
+        if (i - start) % every == 0
+    ]
     caption = (
         "Net present value when one input moves to the low or high end of its "
         "stated range."
@@ -615,12 +678,14 @@ def _tornado(
     base_label = "Base case %s" % money(base)
     anchor = "start" if base_at < 0.18 else ("end" if base_at > 0.82 else "mid")
     lines = "".join(
-        '<i%s style="left: %s"></i>' % (' class="zero"' if t == 0 else "", _pc(frac(t)))
-        for t, _ in ticks
+        '<i%s style="left: %s"></i>'
+        % (_class_attr("zero" if t == 0 else "", "" if phone else "wide"), _pc(frac(t)))
+        for t, _, phone in shown
     )
     axis = "".join(
-        '<span style="left: %s">%s</span>' % (_pc(frac(t)), _e(text))
-        for t, text in ticks
+        '<span%s style="left: %s">%s</span>'
+        % (_class_attr("" if phone else "wide"), _pc(frac(t)), _e(text))
+        for t, text, phone in shown
     )
     aria = (
         "Tornado chart of net present value at the low and high end of each ranged input, against a base case of %s. %s."
@@ -637,7 +702,7 @@ def _tornado(
         "<figcaption>%s</figcaption>\n</figure>\n"
         % (
             _e(aria),
-            math.ceil(gutter),
+            tip,
             anchor,
             _pc(base_at),
             _e(base_label),
@@ -1304,6 +1369,8 @@ footer a { color: inherit; }
   .kpi.hero .value.l2 { font-size: 36px; }
   .kpi.hero .value.l3 { font-size: 30px; }
   .tornado { --label: 0%; --gut: max(58px, var(--tip)); }
+  /* Ticks only a wide window has room to label, with their gridlines. */
+  .t-axis span.wide, .t-lines i.wide { display: none; }
   .t-row { grid-template-columns: 1fr; }
   /* The name sits above its bar here; mask the grid lines behind it. */
   .t-name { padding: 10px 0 0; position: relative; z-index: 1; background: var(--surface); }
