@@ -820,6 +820,18 @@ class TestEdgeCases(unittest.TestCase):
                 self.assertIn(names[-1], ("Year 9", "Y9"))
                 self.assertEqual(len(names), len(set(names)))
 
+    def test_a_long_unit_wraps_instead_of_widening_the_ledger(self):
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        unit = "minutes saved per ticket on suggested-reply acceptance"
+        raw["drivers"][1]["inputs"]["minutes_saved"]["unit"] = unit
+        self.assertIn('<span class="long">1.8 %s</span>' % unit, render(raw))
+        # Every value the example has stays on one line on a wide screen.
+        self.assertNotIn('<span class="long">', load_spec(EXAMPLE).to_html())
+        # The rule that lets it wrap is top-level (rules inside @media blocks
+        # are indented), so it holds at every width, not only narrow ones.
+        self.assertIn("\ntd.n .long { white-space: normal;", report.CSS)
+
     def test_long_currency_codes_turn_the_cash_table_into_cards(self):
         html = render(edge_cases()["currency code"])
         self.assertIn(

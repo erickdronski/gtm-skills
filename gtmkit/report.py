@@ -87,6 +87,12 @@ _MIN_GUTTER = {"phone": 58.0, "wide": 70.0}
 AXIS_FONT = 12.0
 AXIS_GAP = 8.0
 
+# Ledger values are 13.5px. The longest the ledger keeps on one line on a wide
+# screen, by the _text_width estimate: room for "1.8 minutes per ticket"
+# (181px) with a margin for long input names in the next column.
+LEDGER_FONT = 13.5
+LEDGER_ONE_LINE = 200.0
+
 
 # -- scales and labels ----------------------------------------------------
 
@@ -1105,6 +1111,18 @@ def _floor(data: Mapping[str, Any], money: _Money) -> str:
     )
 
 
+def _ledger_value(text: str) -> str:
+    """A ledger value, kept on one line on a wide screen unless it is long.
+
+    The ledger is 870px wide there, and its other four columns need about
+    560px; a value past LEDGER_ONE_LINE (estimated) may wrap at any width,
+    so a long unit cannot push the Source column off the card.
+    """
+    if _text_width(text, LEDGER_FONT) <= LEDGER_ONE_LINE:
+        return _e(text)
+    return '<span class="long">%s</span>' % _e(text)
+
+
 def _ledger(case: Any) -> str:
     rows = []
     for driver in case.drivers:
@@ -1114,7 +1132,7 @@ def _ledger(case: Any) -> str:
                 [
                     '<b>%s</b><span class="under">%s</span>'
                     % (_e(name), _e(driver.label)),
-                    _e(
+                    _ledger_value(
                         fmt_multiple(inp.value) + (" %s" % inp.unit if inp.unit else "")
                     ),
                     _chip(inp.confidence),
@@ -1372,6 +1390,7 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space:
 td.n:not(:last-child), th.n:not(:last-child) { padding-right: 16px; }
 td.nowrap { white-space: nowrap; overflow-wrap: normal; }
 td.n.wrap { min-width: 6em; }
+td.n .long { white-space: normal; overflow-wrap: anywhere; }
 td.label { min-width: 8em; }
 td.src { color: var(--ink-2); min-width: 200px; overflow-wrap: anywhere; }
 td .under { display: block; color: var(--muted); font-size: 12px; }
