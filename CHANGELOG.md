@@ -79,7 +79,7 @@ renders as an HTML report to share.
 - A source distribution built from the repository carries the engine only, as
   the wheel does: `MANIFEST.in` keeps out the tests, which cannot run without
   the rest of the repository.
-- 463 tests, up from 346. CI also builds the wheel, installs it, and runs the
+- 489 tests, up from 346. CI also builds the wheel, installs it, and runs the
   installed `gtmkit` command, every starter with the command it names, and the
   HTML report outside the repository.
 
