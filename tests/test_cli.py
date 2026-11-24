@@ -176,6 +176,72 @@ class TestUsageNames(unittest.TestCase):
                     result.stdout,
                 )
 
+    def test_python_dash_m_gtmkit_names_itself_in_its_own_messages(self):
+        """The listing and the unknown-analysis error are the front door's own
+        text, not argparse's, and must name the command as typed too."""
+        listing = run_module("-m", "gtmkit").stdout.decode()
+        self.assertIn("usage: python3 -m gtmkit <analysis> [arguments...]", listing)
+        self.assertIn("       python3 -m gtmkit init <kind>", listing)
+        self.assertIn("e.g. python3 -m gtmkit valuecase case.json", listing)
+        self.assertIn("python3 -m gtmkit <analysis> --help", listing)
+        self.assertNotRegex(
+            listing.replace("python3 -m gtmkit", ""),
+            r"\bgtmkit (<|init|valuecase|--version)",
+        )
+        result = run_module("-m", "gtmkit", "valuecas", "case.json")
+        self.assertEqual(result.returncode, 2)
+        self.assertTrue(
+            result.stderr.startswith(b"python3 -m gtmkit: unknown analysis"),
+            result.stderr,
+        )
+
+    def test_init_from_a_clone_names_a_command_the_clone_can_run(self):
+        """`python3 -m gtmkit init` used to say "then run: gtmkit qualify",
+        which a clone without pip does not have."""
+        env = dict(os.environ, PYTHONPATH=REPO_ROOT)
+        with tempfile.TemporaryDirectory() as work:
+
+            def python(*args):
+                return subprocess.run(
+                    [sys.executable, *args],
+                    cwd=work,
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+
+            told = {
+                "value-case": "python3 -m gtmkit valuecase case.json --check",
+                "deal": "python3 -m gtmkit qualify deal.json",
+                "sizing": "python3 -m gtmkit sizing --spec sizing.json",
+            }
+            for kind, command in told.items():
+                with self.subTest(kind=kind):
+                    out = command.split()[-2 if kind == "value-case" else -1]
+                    result = python("-m", "gtmkit", "init", kind, "--out", out)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        result.stderr.decode(),
+                        "wrote %s. Edit it, then run: %s\n" % (out, command),
+                    )
+                    # The suggestion runs, spelled with this interpreter.
+                    ran = python(*command.split()[1:])
+                    self.assertEqual(ran.returncode, 0, ran.stderr)
+                    again = python("-m", "gtmkit", "init", kind, "--out", out)
+                    self.assertEqual(
+                        again.stderr.decode(),
+                        "python3 -m gtmkit init: %s already exists; pass --force "
+                        "to overwrite it\n" % out,
+                    )
+            directory = python("-m", "gtmkit", "init", "deal", "--out", ".")
+            self.assertTrue(
+                directory.stderr.startswith(b"python3 -m gtmkit init: cannot write ."),
+                directory.stderr,
+            )
+            epilog = python("-m", "gtmkit", "init", "--help").stdout.decode()
+            self.assertIn("for `python3 -m gtmkit qualify`", epilog)
+
     def test_a_module_run_directly_keeps_its_own_name(self):
         result = run_module("-m", "gtmkit.valuecase", "--help")
         self.assertEqual(result.returncode, 0, result.stderr)

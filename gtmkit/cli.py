@@ -73,25 +73,26 @@ ANALYSES: Tuple[Tuple[str, str, str], ...] = (
 
 # (kind, template under gtmkit/templates/, what it is, the command to run next).
 # Each template is a byte-for-byte copy of a shipped example; a test fails if
-# a copy drifts from its source in examples/.
+# a copy drifts from its source in examples/. {prog} is the front door as the
+# user typed it, so a clone without pip is told to run `python3 -m gtmkit`.
 STARTERS: Tuple[Tuple[str, str, str, str], ...] = (
     (
         "value-case",
         "value-case.json",
-        "business-case spec for `gtmkit valuecase`",
-        "gtmkit valuecase {path} --check",
+        "business-case spec for `{prog} valuecase`",
+        "{prog} valuecase {path} --check",
     ),
     (
         "deal",
         "deal.json",
-        "one deal's MEDDPICC answers for `gtmkit qualify`",
-        "gtmkit qualify {path}",
+        "one deal's MEDDPICC answers for `{prog} qualify`",
+        "{prog} qualify {path}",
     ),
     (
         "sizing",
         "sizing.json",
-        "market-sizing spec for `gtmkit sizing`",
-        "gtmkit sizing --spec {path}",
+        "market-sizing spec for `{prog} sizing`",
+        "{prog} sizing --spec {path}",
     ),
 )
 
@@ -129,41 +130,45 @@ def starter_bytes(kind: str) -> bytes:
     raise KeyError(kind)
 
 
-def _usage() -> str:
+def _usage(prog: str = "gtmkit") -> str:
+    """The listing, naming the front door ``prog`` as the user typed it."""
     width = max(len(name) for name in [*(n for n, _, _ in ANALYSES), "init"])
     lines = [
         "gtmkit %s: go-to-market analysis with explicit assumptions." % __version__,
         "",
-        "usage: gtmkit <analysis> [arguments...]",
-        "       gtmkit init <kind> [--out FILE] [--force]",
-        "       gtmkit --version",
+        "usage: %s <analysis> [arguments...]" % prog,
+        "       %s init <kind> [--out FILE] [--force]" % prog,
+        "       %s --version" % prog,
         "",
         "Analyses:",
     ]
     for name, summary, example in ANALYSES:
         lines.append("  %s  %s" % (name.ljust(width), summary))
-        lines.append("  %s  e.g. gtmkit %s %s" % (" " * width, name, example))
+        lines.append("  %s  e.g. %s %s %s" % (" " * width, prog, name, example))
     lines.extend(
         [
             "",
             "Starter specs:",
             "  %s  Print a starter spec to edit: %s"
             % ("init".ljust(width), ", ".join(kind for kind, _, _, _ in STARTERS)),
-            "  %s  e.g. gtmkit init value-case --out case.json" % (" " * width),
+            "  %s  e.g. %s init value-case --out case.json" % (" " * width, prog),
             "",
-            "Each analysis takes its own arguments: gtmkit <analysis> --help.",
+            "Each analysis takes its own arguments: %s <analysis> --help." % prog,
             "Every analysis also runs as python3 -m gtmkit.<analysis>.",
         ]
     )
     return "\n".join(lines) + "\n"
 
 
-def _init(argv: Sequence[str], prog: str = "gtmkit init") -> int:
+def _init(argv: Sequence[str], prog: str = "gtmkit") -> int:
+    """``gtmkit init``; ``prog`` is the front door as typed, for every message."""
+    command = "%s init" % prog
     kinds = "\n".join(
-        "  %-11s %s" % (kind, summary) for kind, _, summary, _ in STARTERS
+        "  %-11s %s" % (kind, summary.format(prog=prog))
+        for kind, _, summary, _ in STARTERS
     )
     parser = argparse.ArgumentParser(
-        prog=prog,
+        prog=command,
         description=(
             "Print a starter spec to stdout, or write it with --out. Each "
             "starter is a complete worked example that validates as shipped; "
@@ -199,7 +204,7 @@ def _init(argv: Sequence[str], prog: str = "gtmkit init") -> int:
     if os.path.isdir(args.out):
         # No flag can write a file over a directory, so --force is not offered.
         sys.stderr.write(
-            "gtmkit init: cannot write %s: %s\n" % (args.out, os.strerror(errno.EISDIR))
+            "%s: cannot write %s: %s\n" % (command, args.out, os.strerror(errno.EISDIR))
         )
         return 1
     try:
@@ -209,35 +214,39 @@ def _init(argv: Sequence[str], prog: str = "gtmkit init") -> int:
             handle.write(data)
     except FileExistsError:
         sys.stderr.write(
-            "gtmkit init: %s already exists; pass --force to overwrite it\n" % args.out
+            "%s: %s already exists; pass --force to overwrite it\n"
+            % (command, args.out)
         )
         return 1
     except OSError as exc:
         sys.stderr.write(
-            "gtmkit init: cannot write %s: %s\n" % (args.out, exc.strerror or exc)
+            "%s: cannot write %s: %s\n" % (command, args.out, exc.strerror or exc)
         )
         return 1
 
     follow_up = next(cmd for kind, _, _, cmd in STARTERS if kind == args.kind)
     shown = '"%s"' % args.out if " " in args.out else args.out
     sys.stderr.write(
-        "wrote %s. Edit it, then run: %s\n" % (args.out, follow_up.format(path=shown))
+        "wrote %s. Edit it, then run: %s\n"
+        % (args.out, follow_up.format(prog=prog, path=shown))
     )
     return 0
 
 
 def main(argv: Optional[Sequence[str]] = None, prog: str = "gtmkit") -> int:
-    """Run the front door. ``prog`` is how it was invoked, for usage lines."""
+    """Run the front door. ``prog`` is how it was invoked: the listing, every
+    error and the command ``init`` suggests next name it, so a clone without
+    pip is never told to run a ``gtmkit`` it does not have."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] in ("-h", "--help", "help"):
-        sys.stdout.write(_usage())
+        sys.stdout.write(_usage(prog))
         return 0
     if args[0] in ("-V", "--version"):
         sys.stdout.write("gtmkit %s\n" % __version__)
         return 0
     command, rest = args[0], args[1:]
     if command == "init":
-        return _init(rest, "%s init" % prog)
+        return _init(rest, prog)
 
     names = [name for name, _, _ in ANALYSES]
     if command not in names:
@@ -249,8 +258,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "gtmkit") -> int:
             if close:
                 problem += " Did you mean %r?" % close[0]
         sys.stderr.write(
-            "gtmkit: %s\nValid analyses: %s.\nAlso: init, --version, --help.\n"
-            % (problem, ", ".join(names))
+            "%s: %s\nValid analyses: %s.\nAlso: init, --version, --help.\n"
+            % (prog, problem, ", ".join(names))
         )
         return 2
 

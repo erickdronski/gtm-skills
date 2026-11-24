@@ -18,7 +18,8 @@ renders as an HTML report to share.
 - `gtmkit` lists every analysis with an example, and `gtmkit <analysis>`
   passes its arguments unchanged to the module, so it takes exactly what
   `python3 -m gtmkit.<analysis>` takes. `python3 -m gtmkit` is the same front
-  door without installing.
+  door without installing, and names itself that way in its listing, its
+  errors and the command `init` says to run next.
 - `gtmkit init value-case|deal|sizing` prints a starter spec, or writes it with
   `--out` and will not overwrite an existing file without `--force`. Each
   starter is a byte-for-byte copy of the shipped example; a test fails if one
