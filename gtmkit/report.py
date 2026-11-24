@@ -694,9 +694,9 @@ def _tornado(
     # Label every k-th tick, counted from zero when the axis has it, with k as
     # small as the narrowest window of each layout allows. A phone labels a
     # subset of the ticks a wide window labels, and hides the other gridlines.
-    widest = max(_text_width(text, AXIS_FONT) for _, text in ticks)
-    values = [t for t, _ in ticks]
-    start = values.index(0.0) if 0.0 in values else 0
+    widest = max([_text_width(text, AXIS_FONT) for _, text in ticks] or [0.0])
+    at = [t for t, _ in ticks]
+    start = at.index(0.0) if 0.0 in at else 0
     step_px = {
         layout: tornado_axis_width(layout, tip) * scale.step / (scale.hi - scale.lo)
         for layout in ("wide", "phone")
