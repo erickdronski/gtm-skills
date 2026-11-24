@@ -480,15 +480,16 @@ class ValueCase:
         """
         cur = self.currency
         summary = self.summary()
+        if summary["irr_is_ambiguous"]:
+            irr = "multiple cash flow sign changes (use NPV)"
+        elif summary["irr_annual"] is None:
+            irr = "no IRR found in the search range"
+        else:
+            irr = fmt_pct(summary["irr_annual"])
         return [
             ("Net present value", fmt_currency(summary["npv"], cur)),
             ("Discounted payback", fmt_periods(summary["discounted_payback_periods"])),
-            (
-                "IRR",
-                fmt_pct(summary["irr_annual"])
-                if summary["irr_annual"] is not None
-                else "not meaningful for this cash flow shape",
-            ),
+            ("IRR", irr),
             ("Total investment", fmt_currency(summary["total_investment"], cur)),
             ("Total modeled benefit", fmt_currency(summary["total_benefit"], cur)),
             ("Margin of safety", _margin_of_safety(summary)),

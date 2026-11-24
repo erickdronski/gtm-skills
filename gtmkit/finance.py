@@ -136,8 +136,25 @@ def irr(
     if all(value >= 0 for value in flows) or all(value <= 0 for value in flows):
         return None
 
+    # Zero padding changes the period used to value the series, never its roots.
+    # Trimming it avoids rounding a tiny nonzero value down to zero at a bound.
+    first = next(i for i, flow in enumerate(flows) if flow)
+    last = next(i for i in reversed(range(len(flows))) if flows[i])
+    flows = flows[first : last + 1]
+
     def f(rate: float) -> float:
-        return npv(rate, flows)
+        discount = present_value(1.0, rate, 1)
+        # Present and terminal values have the same sign at any rate > -1.
+        # Evaluate at the endpoint where each step shrinks, so a long monthly
+        # series never divides by (1 + rate) ** 120 near the lower bound.
+        if rate < 0:
+            factor, ordered = 1.0 + rate, iter(flows)
+        else:
+            factor, ordered = discount, reversed(flows)
+        total = 0.0
+        for flow in ordered:
+            total = total * factor + flow
+        return total
 
     f_low = f(low)
     f_high = f(high)
@@ -145,15 +162,15 @@ def irr(
         return low
     if f_high == 0:
         return high
-    if f_low * f_high > 0:
+    if (f_low < 0) == (f_high < 0):
         return None
 
     for _ in range(max_iterations):
         mid = (low + high) / 2.0
         f_mid = f(mid)
-        if abs(f_mid) < tolerance or (high - low) / 2.0 < tolerance:
+        if f_mid == 0 or (high - low) / 2.0 < tolerance:
             return mid
-        if f_low * f_mid < 0:
+        if (f_low < 0) != (f_mid < 0):
             high = mid
             f_high = f_mid
         else:

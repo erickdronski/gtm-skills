@@ -857,7 +857,7 @@ class TestEdgeCases(unittest.TestCase):
     def test_undefined_irr_and_payback_render_as_words(self):
         never = render(edge_cases()["payback never"])
         self.assertIn(">never within the modeled horizon</div>", never)
-        self.assertIn(">not meaningful for this cash flow shape</div>", never)
+        self.assertIn(">no IRR found in the search range</div>", never)
         self.assertIn('class="value num long"', never)
 
     def test_a_value_in_words_gets_the_text_size(self):
@@ -1173,6 +1173,22 @@ class TestEdgeCases(unittest.TestCase):
 
 
 class TestSharedWording(unittest.TestCase):
+    def test_multiple_valid_irrs_are_flagged_in_both_reports(self):
+        raw = spec(
+            costs=[{"id": "cost", "label": "Costs", "schedule": [100, 70, 762, 268]}]
+        )
+        driver = raw["drivers"][0]
+        driver["ramp"] = [1, 1, 1]
+        driver["realization"] = 1
+        driver["inputs"]["volume"]["value"] = 40
+        case = validate_spec(raw)
+        # These net flows have three valid rates: 0%, 10% and 20%.
+        self.assertEqual(case.net_flows(), [-100, 330, -362, 132])
+        self.assertIsNotNone(case.summary()["irr_per_period"])
+        warning = "multiple cash flow sign changes (use NPV)"
+        self.assertEqual(markdown_headline(case.to_markdown())["IRR"], warning)
+        self.assertEqual(html_headline(case.to_html())["IRR"], warning)
+
     """Sentences both renderers print must not drift apart."""
 
     def test_floor_and_range_wording_matches_the_markdown(self):

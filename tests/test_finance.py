@@ -76,6 +76,22 @@ class TestIRR(unittest.TestCase):
         # -100 today, 110 in one period => exactly 10%.
         self.assertAlmostEqual(finance.irr([-100, 110]), 0.10, places=6)
 
+    def test_ten_year_monthly_series(self):
+        for monthly_rate in (0.01, -0.01):
+            with self.subTest(monthly_rate=monthly_rate):
+                flows = [-1000] + [0] * 119 + [1000 * (1 + monthly_rate) ** 120]
+                result = finance.summarize(flows, 0.005, periods_per_year=12)
+                self.assertAlmostEqual(result["irr_per_period"], monthly_rate, places=8)
+                self.assertAlmostEqual(
+                    result["irr_annual"], (1 + monthly_rate) ** 12 - 1, places=8
+                )
+
+    def test_amount_scale_and_zero_padding_do_not_change_the_rate(self):
+        for scale in (1e-180, 1.0, 1e180):
+            with self.subTest(scale=scale):
+                flows = [0] * 120 + [-100 * scale, 110 * scale] + [0] * 120
+                self.assertAlmostEqual(finance.irr(flows), 0.10, places=8)
+
     def test_all_positive_has_no_irr(self):
         self.assertIsNone(finance.irr([100, 100, 100]))
 

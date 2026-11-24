@@ -30,6 +30,9 @@ renders as an HTML report to share.
 
 ### Engine
 
+- IRR handles long monthly cash flows and small or large amounts. The HTML
+  and Markdown reports flag multiple sign changes in the cash flows, where
+  several rates can be valid for the same investment.
 - `gtmkit valuecase --format html` writes one self-contained HTML file: the
   headline and margin of safety, the evidence grade, a tornado of every ranged
   input, the cash flow, value drivers, where the value comes from, the floor
@@ -79,7 +82,7 @@ renders as an HTML report to share.
 - A source distribution built from the repository carries the engine only, as
   the wheel does: `MANIFEST.in` keeps out the tests, which cannot run without
   the rest of the repository.
-- 489 tests, up from 346. CI also builds the wheel, installs it, and runs the
+- 492 tests, up from 346. CI also builds the wheel, installs it, and runs the
   installed `gtmkit` command, every starter with the command it names, and the
   HTML report outside the repository.
 

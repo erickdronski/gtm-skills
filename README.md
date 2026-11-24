@@ -5,7 +5,7 @@ reproducible Python calculations.
 
 [![CI](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-101828)](LICENSE)
-![489 tests](https://img.shields.io/badge/tests-489-6b21a8)
+![492 tests](https://img.shields.io/badge/tests-492-6b21a8)
 
 [Install](#install) · [Example](#see-it-work) · [Share it](#share-it) ·
 [Assumptions](#the-assumption-ledger) · [Skills](#the-nine-skills) ·
