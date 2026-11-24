@@ -34,6 +34,9 @@ Modules:
 ``pipeline``
     Coverage against a target, a weighted forecast whose stage probabilities
     carry their sources, the commit view, hygiene flags, and concentration.
+``report``
+    The value case as one self-contained HTML file to share: headline,
+    evidence grade, tornado, cash flow and the full ledger, light and dark.
 ``fmt``
     Executive-readable number and table formatting.
 ``cli``
@@ -48,7 +51,7 @@ Every CLI is invoked the same way::
 or, after ``pip install``, as ``gtmkit <module> --help``.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "cli",
@@ -60,6 +63,7 @@ __all__ = [
     "pipeline",
     "pricing",
     "qualify",
+    "report",
     "scoring",
     "sizing",
     "valuecase",

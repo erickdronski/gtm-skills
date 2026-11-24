@@ -334,6 +334,55 @@ class TestReadmeStaysHonest(unittest.TestCase):
                 )
                 self.assertIn(quoted, self.readme)
 
+    def test_quoted_value_case_brief_is_the_example_output(self):
+        """The README's brief excerpt is generated output: every line of it,
+        the whole headline table, and every word of the evidence section, in
+        order. Only long lines are wrapped."""
+        case = valuecase.load_spec(
+            os.path.join(EXAMPLES, "value-case", "northwind-support-deflection.json")
+        )
+        markdown = case.to_markdown()
+        start = self.readme.index("## Headline")
+        excerpt = self.readme[start : self.readme.index("```", start)]
+        lines = [line for line in excerpt.splitlines() if line.strip()]
+        self.assertGreaterEqual(len(lines), 15)
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertIn(line, markdown)
+
+        def section(text, heading):
+            return text.split(heading, 1)[1].split("\n## ", 1)[0]
+
+        produced = section(markdown, "## Headline")
+        self.assertEqual(
+            [line for line in section(excerpt, "## Headline").splitlines() if line],
+            [line for line in produced.splitlines() if line],
+            "the README's headline table leaves out or changes a row",
+        )
+        self.assertEqual(
+            " ".join(section(excerpt, "## Evidence grade").split()),
+            " ".join(section(markdown, "## Evidence grade").split()),
+        )
+
+    def test_share_it_screenshot_is_shipped_small_and_reproducible(self):
+        start = self.readme.index("## Share it")
+        share = self.readme[start : self.readme.index("\n## ", start + 1)]
+        self.assertRegex(
+            share,
+            r"python3 -m gtmkit\.valuecase "
+            r"examples/value-case/northwind-support-deflection\.json \\\n"
+            r"\s+--format html --out \S+\.html",
+        )
+        image = re.search(r"!\[[^\]]+\]\((assets/[^)]+\.png)\)", share)
+        self.assertIsNotNone(image, "the Share it section shows no screenshot")
+        path = os.path.join(REPO_ROOT, image.group(1))
+        self.assertLess(os.path.getsize(path), 400 * 1024)
+        with open(path, "rb") as handle:
+            header = handle.read(24)
+        self.assertEqual(header[:8], b"\x89PNG\r\n\x1a\n")
+        width = int.from_bytes(header[16:20], "big")
+        self.assertTrue(1100 <= width <= 1300, "screenshot is %dpx wide" % width)
+
     def test_quoted_qualification_verdict_matches_the_example(self):
         """Every line of the README's verdict excerpt must still be generated."""
         with open(

@@ -4,6 +4,60 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-11-24
+
+The engine installs with pip behind one `gtmkit` command, and a value case
+renders as an HTML report to share.
+
+### Install
+
+- `pip install git+https://github.com/erickdronski/gtm-skills` installs the
+  `gtmkit` package and command, with no dependencies. It is not published on
+  PyPI. The skills stay in the repository: use the Claude Code plugin or a
+  clone for them.
+- `gtmkit` lists every analysis with an example, and `gtmkit <analysis>`
+  passes its arguments unchanged to the module, so it takes exactly what
+  `python3 -m gtmkit.<analysis>` takes. `python3 -m gtmkit` is the same front
+  door without installing.
+- `gtmkit init value-case|deal|sizing` prints a starter spec, or writes it with
+  `--out` and will not overwrite an existing file without `--force`. Each
+  starter is a byte-for-byte copy of the shipped example; a test fails if one
+  drifts.
+
+### Engine
+
+- `gtmkit valuecase --format html` writes one self-contained HTML file: the
+  headline and margin of safety, the evidence grade, a tornado of every ranged
+  input, the cash flow, value drivers, where the value comes from, the floor
+  case, the full assumption ledger, the cost lines, and the spec's `meta`
+  fields. No JavaScript and no external fonts, images or stylesheets; light and
+  dark themes, a print stylesheet, and a phone layout down to 320px. Figures
+  come from the same code as the markdown brief, every number a chart shows is
+  also written out, every spec string is escaped, and identical input gives
+  identical bytes.
+- `--out` that cannot be written prints one line and exits 1 in every
+  analysis, instead of a traceback.
+- `gtmkit valuecase --check` builds the whole model, so a range bound that
+  breaks a formula (a denominator whose low bound is 0) is a spec error before
+  any output is written. An unreadable or non-UTF-8 spec file and a `meta` that
+  is not an object are spec errors too.
+- The markdown brief says how many attribution and sensitivity rows it leaves
+  out after the first twelve.
+
+### Skills
+
+- `value-case` shows the `--format html` command, and the spec reference says
+  where `meta` appears in the report.
+
+### Tooling
+
+- The skill linter checks `gtmkit <analysis>` commands as well as
+  `python3 -m gtmkit.<module>` ones.
+- The README's quoted brief is checked line by line against the example's
+  output, and its report screenshot for size.
+- 437 tests, up from 346. CI also builds the wheel, installs it, and runs the
+  installed `gtmkit` command and the HTML report outside the repository.
+
 ## [0.3.0] — 2026-11-20
 
 - Value cases support shared inputs with one evidence record and explicit

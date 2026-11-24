@@ -5,9 +5,9 @@ reproducible Python calculations.
 
 [![CI](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/erickdronski/gtm-skills/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-101828)](LICENSE)
-![346 tests](https://img.shields.io/badge/tests-346-6b21a8)
+![437 tests](https://img.shields.io/badge/tests-437-6b21a8)
 
-[Install](#install) · [Example](#see-it-work) ·
+[Install](#install) · [Example](#see-it-work) · [Share it](#share-it) ·
 [Assumptions](#the-assumption-ledger) · [Skills](#the-nine-skills) ·
 [Engine](#the-engine)
 
@@ -26,14 +26,24 @@ The CLI also works without an AI agent or API key.
 
 ## Install
 
-**As a Claude Code plugin** (recommended):
+**The engine and the `gtmkit` command, with pip.** gtm-skills is not on PyPI;
+pip installs it straight from this repository:
+
+```bash
+pip install git+https://github.com/erickdronski/gtm-skills
+```
+
+That installs the `gtmkit` package and command only. The skills stay in the
+repository, so use the plugin or a clone below for those.
+
+**As a Claude Code plugin** (recommended for the skills):
 
 ```bash
 /plugin marketplace add erickdronski/gtm-skills
 /plugin install gtm-skills
 ```
 
-**Other agents or the standalone CLI — clone the full repository:**
+**Other agents, or to run the tests — clone the full repository:**
 
 ```bash
 git clone https://github.com/erickdronski/gtm-skills
@@ -41,8 +51,8 @@ cd gtm-skills
 python3 -m unittest discover -s tests -t .
 ```
 
-No dependencies. No install step. No API key. Python 3.9+ and nothing else —
-the entire engine is standard library, offline, and does not phone home.
+No dependencies. No API key. Python 3.9+ and nothing else — the entire engine
+is standard library, offline, and does not phone home.
 
 Open the clone in your agent and ask it to read the relevant
 `skills/<name>/SKILL.md`. Skill discovery varies by agent; reading the root
@@ -68,13 +78,34 @@ repo-root `gtmkit/` engine and `examples/`. Use the full plugin or clone above
 for the calculation workflows; an individual `SKILL.md` is not a standalone
 package.
 
+### The `gtmkit` command
+
+`gtmkit` on its own lists every analysis with an example. `gtmkit <analysis>`
+runs one with exactly the arguments `python3 -m gtmkit.<analysis>` takes, and
+`gtmkit init` writes a starter spec to edit: a copy of a shipped example, which
+it will not write over an existing file without `--force`.
+
+```bash
+gtmkit                                    # list the analyses
+gtmkit init value-case --out case.json    # starter spec: value-case, deal, sizing
+gtmkit valuecase case.json --check        # validate it
+gtmkit valuecase case.json                # the markdown brief
+```
+
+In a clone without pip, `python3 -m gtmkit` run from the repository root is
+the same command.
+
 ## See it work
 
-After cloning the repository, run the included example:
+From a clone, run the included example:
 
 ```bash
 python3 -m gtmkit.valuecase examples/value-case/northwind-support-deflection.json
 ```
+
+After a pip install, `gtmkit init value-case --out case.json` writes the same
+spec and `gtmkit valuecase case.json` prints the same brief. Its headline and
+evidence grade, with long lines wrapped here:
 
 ```
 ## Headline
@@ -85,6 +116,7 @@ python3 -m gtmkit.valuecase examples/value-case/northwind-support-deflection.jso
 | Discounted payback    | 2 yr 4 mo                                                |
 | IRR                   | 32%                                                      |
 | Total investment      | $579.7k                                                  |
+| Total modeled benefit | $788.6k                                                  |
 | Margin of safety      | benefits can come in 17% below plan and still break even |
 
 ## Evidence grade: C
@@ -93,9 +125,14 @@ Grade C. 35% of modeled value rests on assumptions and only 33% on measured
 facts. State this before the reader finds it, and prioritize measuring the
 largest assumption.
 
+- Measured facts: 33% of modeled value
+- Derived inferences: 33%
+- Unmeasured assumptions: 35%
+
 **Measure this first — Tickets deflected to self-service, Reduced handle time on retained tickets / deflection_rate.**
 This one input moves NPV by $311.6k across its stated range and it flips the
-decision at a stated bound.
+decision at a stated bound. If any number in this case deserves a measurement
+before the decision, it is this one.
 ```
 
 This is output from the included example, not a reported customer outcome.
@@ -105,6 +142,28 @@ The example uses one deflection rate for both avoided tickets and handle time on
 remaining tickets. Changing the rate updates both benefit streams.
 It validates the structure and specificity of source descriptions; a reviewer
 still needs to verify the underlying evidence.
+
+## Share it
+
+`--format html` writes the value case as one HTML file for a reader who will
+never open the spec: the headline, the evidence grade, a tornado of every
+ranged input, the cash flow, the value drivers and where the value comes
+from, the floor case, the full assumption ledger and the cost lines. The file
+has no JavaScript and no external fonts, images or stylesheets. It follows the
+reader's light or dark setting, prints, and fits a phone screen. Its figures
+come from the same code as the markdown brief, and every number a chart shows
+is also written out as text or in a table.
+
+```bash
+python3 -m gtmkit.valuecase examples/value-case/northwind-support-deflection.json \
+  --format html --out northwind.html
+```
+
+![Top of the HTML report for the Northwind example: headline, evidence grade, tornado, and cash flow](assets/northwind-report.png)
+
+The screenshot is the top of the file that command writes, in the light theme.
+After a pip install the same option works anywhere:
+`gtmkit valuecase case.json --format html --out case.html`.
 
 ## The assumption ledger
 
@@ -192,7 +251,7 @@ which conclusions depend on assumptions.
 ## The engine
 
 `gtmkit` is the deterministic core. Each module is a CLI and an importable
-library:
+library (after a pip install, `gtmkit <module>` runs the same command):
 
 ```bash
 python3 -m gtmkit.valuecase case.json          # business case with sensitivity
@@ -204,7 +263,9 @@ python3 -m gtmkit.qualify deal.json            # MEDDPICC, confirmed vs assumed
 python3 -m gtmkit.pipeline pipeline.csv --stages stages.json --target 1200000
 ```
 
-Add `--format json` to any of them to build your own view on top.
+Add `--format json` to any of them to build your own view on top;
+`gtmkit.valuecase` also writes the HTML report described in
+[Share it](#share-it).
 
 Implementation details worth reviewing:
 
