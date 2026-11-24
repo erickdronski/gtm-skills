@@ -199,6 +199,11 @@ class TestUsageNames(unittest.TestCase):
         """`python3 -m gtmkit init` used to say "then run: gtmkit qualify",
         which a clone without pip does not have."""
         env = dict(os.environ, PYTHONPATH=REPO_ROOT)
+
+        def lines(raw):
+            # Windows writes "\r\n" to a piped stderr; compare the text.
+            return raw.decode().replace("\r\n", "\n")
+
         with tempfile.TemporaryDirectory() as work:
 
             def python(*args):
@@ -222,7 +227,7 @@ class TestUsageNames(unittest.TestCase):
                     result = python("-m", "gtmkit", "init", kind, "--out", out)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(
-                        result.stderr.decode(),
+                        lines(result.stderr),
                         "wrote %s. Edit it, then run: %s\n" % (out, command),
                     )
                     # The suggestion runs, spelled with this interpreter.
@@ -230,7 +235,7 @@ class TestUsageNames(unittest.TestCase):
                     self.assertEqual(ran.returncode, 0, ran.stderr)
                     again = python("-m", "gtmkit", "init", kind, "--out", out)
                     self.assertEqual(
-                        again.stderr.decode(),
+                        lines(again.stderr),
                         "python3 -m gtmkit init: %s already exists; pass --force "
                         "to overwrite it\n" % out,
                     )
