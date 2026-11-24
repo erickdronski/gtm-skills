@@ -896,6 +896,76 @@ class TestEdgeCases(unittest.TestCase):
         tips = re.findall(r'<span class="tip (?:lo|hi)"[^>]*>([^<]*)</span>', html)
         self.assertEqual(set(tips), {valuecase.fmt_currency(base)})
 
+    def test_a_swing_printed_apart_keeps_its_scale_across_1m(self):
+        """Once one bar end reached $1M, its $100k rounding step made the axis
+        span at least $1M: the same $35k swing filled the chart at a $965k base
+        and was a 3% sliver at $970k, though $935k, $970k and $1M print apart."""
+
+        def bars(fixed, low, high):
+            source = "Zendesk export 2025, rows 1-400, shared by ops on 2026-07-14"
+            raw = {
+                "name": "Near $1M",
+                "horizon_years": 1,
+                "discount_rate_annual": 0,
+                "drivers": [
+                    {
+                        "id": "d0",
+                        "label": "Driver 0",
+                        "formula": "x0",
+                        "inputs": {
+                            "x0": {
+                                "value": 1000,
+                                "confidence": "assumption",
+                                "source": source,
+                                "low": low,
+                                "high": high,
+                            }
+                        },
+                        "realization": 1.0,
+                    },
+                    {
+                        "id": "fixed",
+                        "label": "Fixed benefit",
+                        "formula": "f",
+                        "inputs": {
+                            "f": {
+                                "value": fixed,
+                                "confidence": "fact",
+                                "source": source,
+                            }
+                        },
+                        "realization": 1.0,
+                    },
+                ],
+                "costs": [{"id": "c", "label": "Cost", "schedule": [0, 0]}],
+            }
+            html = render(raw)
+            tips = re.findall(r'<span class="tip (?:lo|hi)"[^>]*>([^<]*)</span>', html)
+            widths = re.findall(
+                r'class="bar (?:below|above)" style="[^"]*width: ([\d.]+)%', html
+            )
+            return tips, [float(w) for w in widths]
+
+        # Base $965k: $930k to $999k. Base $970k: $935k to $1.004M.
+        below_tips, below = bars(964000, -34000, 35000)
+        across_tips, across = bars(969000, -34000, 35000)
+        self.assertEqual(below_tips, ["$930k", "$999k"])
+        self.assertEqual(across_tips, ["$935k", "$1M"])
+        for width_below, width_across in zip(below, across):
+            self.assertGreater(width_across, 40)
+            self.assertAlmostEqual(width_across, width_below, delta=10)
+        # $995k and $1M against $999k also print apart: the bars fill the
+        # axis between them instead of being 0.36% slivers.
+        tight_tips, tight = bars(998000, -3000, 5000)
+        self.assertEqual(tight_tips, ["$995k", "$1M"])
+        self.assertGreater(min(tight), 25)
+        self.assertGreater(sum(tight), 90)
+        # Above $1M a bar whose end prints as the base does ("$1M" for both
+        # $1.04M and $1.02M) is still kept to a sliver, as 2b4e448 meant.
+        mixed_tips, mixed = bars(1019000, -29000, 21000)
+        self.assertEqual(mixed_tips, ["$990k", "$1M"])
+        self.assertTrue(all(width < 5 for width in mixed), mixed)
+
     def test_the_last_period_is_always_named(self):
         html = render(edge_cases()["nine years"])
         for variant in ("wide", "narrow"):

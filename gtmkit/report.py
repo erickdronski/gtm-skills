@@ -631,6 +631,31 @@ def _label_stride(widest: float, step_px: float, count: int, every: int = 1) -> 
     return stride
 
 
+def _rounding_step(rows: Sequence[Mapping[str, Any]], base: float) -> float:
+    """The step the tornado's printed figures are compared at.
+
+    A bar must not stretch a difference the printed figures round away, so the
+    axis spans at least ten of these steps: a swing of $2.50 on a -$74.9k base
+    stays a sliver beside labels that agree. Each bar runs from the base to one
+    end of a row's range, and its two figures can be told apart only as finely
+    as the finer of the steps fmt_currency rounds them to: "$970k" against
+    "$1M" shows a $30k drop, though "$1M" alone rounds to $100k. The axis takes
+    the coarsest of these per-bar steps, or the base's own when no bar is drawn.
+    """
+    if not _finite(base):
+        return 0.0
+    steps = []
+    for row in rows:
+        # The ends _tornado draws a bar to: one below the base, one above it.
+        low, high = row["npv_low"], row["npv_high"]
+        if not low <= high:
+            low, high = high, low
+        for end, drawn in ((low, low < base), (high, high > base)):
+            if drawn and _finite(end):
+                steps.append(min(currency_step(base), currency_step(end)))
+    return max(steps or [currency_step(base)])
+
+
 def _tornado(
     rows: Sequence[Mapping[str, Any]],
     base: float,
@@ -639,11 +664,7 @@ def _tornado(
 ) -> str:
     """One row per ranged input on one shared NPV axis, base line marked."""
     values = [base] + [r[k] for r in rows for k in ("npv_low", "npv_high")]
-    # A bar must not stretch a difference the printed figures round away: the
-    # axis spans at least ten of the steps fmt_currency rounds to, so a swing
-    # of $2.50 on a -$74.9k base stays a sliver beside labels that agree.
-    rounding = max([currency_step(v) for v in values if _finite(v)] or [0.0])
-    scale = nice_scale(values, min_span=10 * rounding)
+    scale = nice_scale(values, min_span=10 * _rounding_step(rows, base))
     frac = scale.fraction
     base_at = frac(base) if _finite(base) else 0.0
     tips: List[str] = []
