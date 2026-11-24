@@ -106,6 +106,9 @@ FLOOR_FAILS = (
     "The case goes negative at the floor. Say so, and name which input has to "
     "hold for it not to."
 )
+# The markdown brief lists this many attribution and sensitivity rows and says
+# how many it left out; the HTML report and the JSON model carry every row.
+BRIEF_ROWS = 12
 
 
 class SpecError(ValueError):
@@ -580,6 +583,7 @@ class ValueCase:
             "carrying the most weight in the entire case."
         )
         lines.append("")
+        attribution = self.evidence_by_input()
         attribution_rows = [
             [
                 "%s / %s" % (row["driver_label"], row["input"]),
@@ -587,7 +591,7 @@ class ValueCase:
                 fmt_pct(row["share_of_driver"]),
                 fmt_currency(row["npv_attributed"], cur),
             ]
-            for row in self.evidence_by_input()[:12]
+            for row in attribution[:BRIEF_ROWS]
         ]
         lines.append(
             table(
@@ -595,6 +599,7 @@ class ValueCase:
                 attribution_rows,
             )
         )
+        lines.extend(_rows_left_out(len(attribution), "inputs carrying less value"))
         lines.append("")
 
         lines.append("## Cash flow")
@@ -629,6 +634,7 @@ class ValueCase:
             "else holds at base. Sorted by how much the decision moves."
         )
         lines.append("")
+        sensitivity = self.sensitivity()
         sens_rows = [
             [
                 "%s / %s" % (row["driver_label"], row["input"]),
@@ -638,7 +644,7 @@ class ValueCase:
                 fmt_currency(row["npv_high"], cur),
                 "yes" if row["flips_decision"] else "no",
             ]
-            for row in self.sensitivity()[:12]
+            for row in sensitivity[:BRIEF_ROWS]
         ]
         if sens_rows:
             lines.append(
@@ -653,6 +659,9 @@ class ValueCase:
                     ],
                     sens_rows,
                 )
+            )
+            lines.extend(
+                _rows_left_out(len(sensitivity), "ranged inputs that move NPV less")
             )
         else:
             lines.append("_%s_" % NO_RANGE_NOTE)
@@ -734,6 +743,17 @@ class ValueCase:
             "library — no number in this document was written by hand._"
         )
         return "\n".join(lines)
+
+
+def _rows_left_out(total: int, what: str) -> List[str]:
+    """The note under a brief table cut at :data:`BRIEF_ROWS`, or nothing."""
+    if total <= BRIEF_ROWS:
+        return []
+    return [
+        "",
+        "_%d more %s are not listed here; `--format html` and `--format json` "
+        "include every one._" % (total - BRIEF_ROWS, what),
+    ]
 
 
 def _margin_of_safety(summary: Mapping[str, Any]) -> str:

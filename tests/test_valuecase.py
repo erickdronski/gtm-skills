@@ -203,6 +203,45 @@ class TestSensitivity(unittest.TestCase):
         self.assertEqual(swings, sorted(swings, reverse=True))
 
 
+class TestBriefSaysWhatItLeavesOut(unittest.TestCase):
+    """The markdown brief lists at most 12 rows per table and counts the rest."""
+
+    def test_short_tables_carry_no_note(self):
+        markdown = validate_spec(minimal_spec()).to_markdown()
+        self.assertNotIn("are not listed here", markdown)
+
+    def test_long_tables_say_how_many_rows_were_left_out(self):
+        spec = minimal_spec()
+        driver = spec["drivers"][0]
+        for i in range(14):
+            driver["inputs"]["x%d" % i] = {
+                "value": 1.0,
+                "confidence": "assumption",
+                "source": "Calibration factor %d from the pilot readout, table 3" % i,
+                "low": 0.9,
+                "high": 1.1 + i * 0.01,
+            }
+        driver["formula"] += "".join(" * x%d" % i for i in range(14))
+        case = validate_spec(spec)
+        self.assertEqual(len(case.sensitivity()), 15)
+        self.assertEqual(len(case.evidence_by_input()), 17)
+        markdown = case.to_markdown()
+        self.assertIn(
+            "_3 more ranged inputs that move NPV less are not listed here; "
+            "`--format html` and `--format json` include every one._",
+            markdown,
+        )
+        self.assertIn(
+            "_5 more inputs carrying less value are not listed here;", markdown
+        )
+        attribution = markdown.split("## Where the value actually comes from")[1]
+        attribution = attribution.split("\n## ")[0]
+        self.assertEqual(attribution.count("| Driver one / "), 12)
+        html = case.to_html()
+        self.assertEqual(html.count('<div class="t-row">'), 15)
+        self.assertEqual(html.count('<div class="r-plot">'), 17)
+
+
 class TestSharedInputs(unittest.TestCase):
     def setUp(self):
         self.rate = minimal_spec()["drivers"][0]["inputs"]["rate"]
