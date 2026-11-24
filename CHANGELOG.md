@@ -53,6 +53,9 @@ renders as an HTML report to share.
   rounded for display.
 - The margin of safety never rounds up to 100%, which would say benefits
   could fall to nothing: a case that breaks even 99.5% below plan says 99.5%.
+- A floor NPV of exactly zero is no longer called negative: the verdict now
+  says the case does not clear zero at the floor. A case with no cost says it
+  breaks even with no benefits at all, not that it clears zero.
 
 ### Skills
 

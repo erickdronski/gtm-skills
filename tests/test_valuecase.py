@@ -9,6 +9,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import tempfile
 import unittest
 from copy import deepcopy
@@ -501,10 +502,58 @@ class TestMarginOfSafety(unittest.TestCase):
                     "benefits can come in %s below plan and still break even" % share,
                 )
 
-    def test_no_cost_at_all_keeps_its_own_wording(self):
+    def test_no_cost_at_all_breaks_even_without_benefits(self):
+        """With no cost and no benefit NPV is exactly zero: break-even, not
+        clearing zero, so the margin and the floor verdict agree."""
         self.assertEqual(
-            self.margin(0), "case clears zero even with no benefits at all"
+            self.margin(0),
+            "no cost to recover — the case breaks even with no benefits at all",
         )
+
+
+class TestFloorVerdict(unittest.TestCase):
+    """The floor verdict must agree with the floor NPV printed above it."""
+
+    def floor_at(self, cost, low=0.5):
+        """b falls to ``low`` at the floor: a floor NPV of 1000 * low - cost."""
+        return validate_spec(
+            one_year_spec(
+                cost,
+                b={
+                    "value": 1,
+                    "confidence": "assumption",
+                    "source": "Observed between 0.5 and 1.5 at two peers",
+                    "low": low,
+                    "high": 1.5,
+                },
+            )
+        )
+
+    def test_a_floor_of_exactly_zero_is_not_called_negative(self):
+        case = self.floor_at(500)
+        self.assertEqual(case.floor_case()["npv"], 0)
+        self.assertFalse(case.floor_case()["still_positive"])
+        self.assertFalse(case.sensitivity()[0]["flips_decision"])
+        for text in (case.to_markdown(), case.to_html()):
+            plain = re.sub(r"<[^>]+>|\*\*", "", text)
+            floor = plain.split("Floor case", 1)[1].split("Assumption ledger", 1)[0]
+            with self.subTest(text=text[:20]):
+                self.assertIn("NPV at the floor: $0 (-$500 vs base)", floor)
+                self.assertIn(valuecase.FLOOR_FAILS, floor)
+                self.assertNotIn("negative", floor)
+
+    def test_the_verdict_follows_the_sign_of_the_floor(self):
+        self.assertIn(valuecase.FLOOR_FAILS, self.floor_at(501).to_markdown())
+        self.assertIn(valuecase.FLOOR_HOLDS[0], self.floor_at(499).to_markdown())
+
+    def test_no_cost_and_a_floor_of_zero_tell_one_story(self):
+        """With no cost, a floor that loses every benefit is exactly zero."""
+        case = self.floor_at(0, low=0)
+        self.assertEqual(case.floor_case()["npv"], 0)
+        markdown = case.to_markdown()
+        self.assertIn(valuecase.FLOOR_FAILS, markdown)
+        self.assertIn("breaks even with no benefits at all", markdown)
+        self.assertNotIn("clears zero even with no benefits", markdown)
 
 
 class TestShippedExample(unittest.TestCase):

@@ -102,9 +102,11 @@ FLOOR_HOLDS = (
     "The case still clears zero even at the floor.",
     " That is the strongest sentence available here — lead with it.",
 )
+# The other side of the same test (floor NPV > 0), so it holds for a floor of
+# exactly zero as well as a negative one.
 FLOOR_FAILS = (
-    "The case goes negative at the floor. Say so, and name which input has to "
-    "hold for it not to."
+    "The case does not clear zero at the floor. Say so, and name which input "
+    "has to hold for it to."
 )
 # What either footer may truthfully say: the ledger, sources, notes and meta
 # are the spec's own words and numbers, so only the computed figures are the
@@ -776,7 +778,10 @@ def _margin_of_safety(summary: Mapping[str, Any]) -> str:
     if multiplier is None:
         return "n/a — no modeled benefit to shrink"
     if multiplier <= 0:
-        return "case clears zero even with no benefits at all"
+        # Only a case whose costs are all zero gets here. With no benefit
+        # either its NPV is exactly zero: it breaks even, it does not clear
+        # zero, which is what the floor verdict would say of it.
+        return "no cost to recover — the case breaks even with no benefits at all"
     if multiplier < 1:
         share = fmt_pct(1 - multiplier)
         if share == "100%":
