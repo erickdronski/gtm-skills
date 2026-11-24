@@ -98,6 +98,11 @@ AXIS_GAP = 8.0
 # (181px) with a margin for long input names in the next column.
 LEDGER_FONT = 13.5
 LEDGER_ONE_LINE = 200.0
+# The longest input name, by the same estimate, that the ledger and the
+# sensitivity table keep whole: from a 761px window up, a 19-character name
+# ("attrition_reduction", 162px) fits beside the other columns and a
+# 22-character one (198px) pushed Source 5px off the card.
+IDENTIFIER_ONE_LINE = 170.0
 
 
 # -- scales and labels ----------------------------------------------------
@@ -272,6 +277,21 @@ def _e(value: Any) -> str:
 
 def _finite(value: Any) -> bool:
     return isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _identifier(name: str) -> str:
+    """An input name, bold, for the Input cell of the ledger or sensitivity table.
+
+    A table column is at least as wide as its longest unbreakable word, so a
+    long name such as minutes_saved_per_ticket_on_suggested_reply_acceptance
+    pushed the Source column off the card. A name past IDENTIFIER_ONE_LINE
+    (estimated) may break after any underscore, and anywhere if one of its
+    parts is still too long; a shorter name, every one of the example's
+    included, stays whole.
+    """
+    if _text_width(name, LEDGER_FONT) <= IDENTIFIER_ONE_LINE:
+        return "<b>%s</b>" % _e(name)
+    return '<b class="long">%s</b>' % _e(name).replace("_", "_<wbr>")
 
 
 def _class_attr(*names: str) -> str:
@@ -544,8 +564,8 @@ def _sensitivity(
     out.append(_tornado(rows, data["summary"]["npv"], money, labels))
     table_rows = [
         [
-            '<b>%s</b><span class="under">%s</span>'
-            % (_e(row["input"]), _e(_row_drivers(row, labels))),
+            '%s<span class="under">%s</span>'
+            % (_identifier(row["input"]), _e(_row_drivers(row, labels))),
             _chip(row["confidence"]),
             _e(_range_text(row["low"], row["high"])),
             _e(money(row["npv_low"])),
@@ -1158,8 +1178,8 @@ def _ledger(case: Any) -> str:
             low, high = inp.range
             rows.append(
                 [
-                    '<b>%s</b><span class="under">%s</span>'
-                    % (_e(name), _e(driver.label)),
+                    '%s<span class="under">%s</span>'
+                    % (_identifier(name), _e(driver.label)),
                     _ledger_value(fmt_multiple(inp.value), inp.unit),
                     _chip(inp.confidence),
                     _e(
@@ -1417,6 +1437,7 @@ td.n.wrap { min-width: 6em; }
 td.n .long { white-space: normal; overflow-wrap: anywhere; }
 td.n .long .fig { white-space: nowrap; }
 td.label { min-width: 8em; }
+td.label b.long { overflow-wrap: anywhere; }
 td.src { color: var(--ink-2); min-width: 200px; overflow-wrap: anywhere; }
 td .under { display: block; color: var(--muted); font-size: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }

@@ -45,7 +45,7 @@ ALLOWED_TAGS = {
     "figure", "footer", "h1", "h2", "h3", "head", "header", "html", "i", "li",
     "line", "main", "meta", "p", "path", "polyline", "section", "small", "span",
     "style", "svg", "table", "tbody", "td", "text", "th", "thead", "title", "tr",
-    "ul",
+    "ul", "wbr",
 }  # fmt: skip
 NON_NUMBERS = re.compile(r"\b(nan|inf|infinity)\b", re.IGNORECASE)
 
@@ -901,6 +901,33 @@ class TestEdgeCases(unittest.TestCase):
             render(raw),
         )
         self.assertIn("\ntd.n .long .fig { white-space: nowrap; }", report.CSS)
+
+    def test_a_long_input_name_may_break_between_its_words(self):
+        """A 54-character name made the ledger 982px wide in an 870px card at
+        1001px and wider, cutting off its Source column."""
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        name = "minutes_saved_per_ticket_on_suggested_reply_acceptance"
+        driver = raw["drivers"][1]
+        driver["inputs"][name] = driver["inputs"].pop("minutes_saved")
+        driver["inputs"][name].update(low=1.2, high=2.4)
+        driver["formula"] = driver["formula"].replace("minutes_saved", name)
+        html = render(raw)
+        broken = name.replace("_", "_<wbr>")
+        ledger = html.split('aria-label="Assumption ledger"', 1)[1]
+        sensitivity = html.split('aria-label="Sensitivity of NPV', 1)[1]
+        for table in (ledger, sensitivity):
+            self.assertIn(
+                '<b class="long">%s</b>' % broken, table.split("</table>", 1)[0]
+            )
+        # Only the table cells: the chart and its titles keep the name whole.
+        self.assertIn("<code>%s</code>" % name, html)
+        self.assertIn("\ntd.label b.long { overflow-wrap: anywhere; }", report.CSS)
+        self.assertEqual(Document(html).problems, [])
+        # The example's names, the longest 19 characters, stay whole.
+        northwind = load_spec(EXAMPLE).to_html()
+        self.assertIn("<b>attrition_reduction</b>", northwind)
+        self.assertNotIn("<wbr>", northwind)
 
     def test_long_currency_codes_turn_the_cash_table_into_cards(self):
         html = render(edge_cases()["currency code"])
