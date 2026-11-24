@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import errno
 import importlib
+import os
 import sys
 from importlib import resources
 from typing import Optional, Sequence, Tuple
@@ -192,6 +194,12 @@ def _init(argv: Sequence[str]) -> int:
             buffer.flush()
         return 0
 
+    if os.path.isdir(args.out):
+        # No flag can write a file over a directory, so --force is not offered.
+        sys.stderr.write(
+            "gtmkit init: cannot write %s: %s\n" % (args.out, os.strerror(errno.EISDIR))
+        )
+        return 1
     try:
         # "x" fails atomically if the file exists, so a starter can never
         # silently replace a spec somebody has been editing.
@@ -203,7 +211,9 @@ def _init(argv: Sequence[str]) -> int:
         )
         return 1
     except OSError as exc:
-        sys.stderr.write("gtmkit init: cannot write %s: %s\n" % (args.out, exc))
+        sys.stderr.write(
+            "gtmkit init: cannot write %s: %s\n" % (args.out, exc.strerror or exc)
+        )
         return 1
 
     follow_up = next(cmd for kind, _, _, cmd in STARTERS if kind == args.kind)

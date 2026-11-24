@@ -8,6 +8,7 @@ printed, and it never overwrites a file somebody has been editing.
 """
 
 import contextlib
+import errno
 import importlib
 import io
 import os
@@ -191,6 +192,25 @@ class TestInit(unittest.TestCase):
         code, _, err = run(["init", "deal", "--out", self.tmp.name, "--force"])
         self.assertEqual(code, 1)
         self.assertIn("cannot write", err)
+
+    def test_a_directory_is_refused_without_offering_force(self):
+        """--force cannot write over a directory, so it must not be suggested."""
+        expected = "gtmkit init: cannot write %s: %s\n" % (
+            self.tmp.name,
+            os.strerror(errno.EISDIR),
+        )
+        for extra in ([], ["--force"]):
+            with self.subTest(extra=extra):
+                code, out, err = run(["init", "sizing", "--out", self.tmp.name, *extra])
+                self.assertEqual((code, out, err), (1, "", expected))
+
+    def test_a_missing_folder_reads_like_the_analyses_out_error(self):
+        target = self.path(os.path.join("missing", "deal.json"))
+        code, _, err = run(["init", "deal", "--out", target])
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            err, "gtmkit init: cannot write %s: No such file or directory\n" % target
+        )
 
     def test_unknown_or_missing_kind_is_a_usage_error(self):
         self.assertEqual(run(["init", "pricing"])[0], 2)
