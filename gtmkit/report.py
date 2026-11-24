@@ -1134,16 +1134,21 @@ def _floor(data: Mapping[str, Any], money: _Money) -> str:
     )
 
 
-def _ledger_value(text: str) -> str:
+def _ledger_value(figure: str, unit: Optional[str]) -> str:
     """A ledger value, kept on one line on a wide screen unless it is long.
 
     The ledger is 870px wide there, and its other four columns need about
     560px; a value past LEDGER_ONE_LINE (estimated) may wrap at any width,
-    so a long unit cannot push the Source column off the card.
+    so a long unit cannot push the Source column off the card. Its figure
+    stays whole even so: "48,000,0" over "00 USD of" reads as two numbers.
     """
+    text = figure + (" %s" % unit if unit else "")
     if _text_width(text, LEDGER_FONT) <= LEDGER_ONE_LINE:
         return _e(text)
-    return '<span class="long">%s</span>' % _e(text)
+    return '<span class="long"><span class="fig">%s</span>%s</span>' % (
+        _e(figure),
+        _e(" %s" % unit) if unit else "",
+    )
 
 
 def _ledger(case: Any) -> str:
@@ -1155,9 +1160,7 @@ def _ledger(case: Any) -> str:
                 [
                     '<b>%s</b><span class="under">%s</span>'
                     % (_e(name), _e(driver.label)),
-                    _ledger_value(
-                        fmt_multiple(inp.value) + (" %s" % inp.unit if inp.unit else "")
-                    ),
+                    _ledger_value(fmt_multiple(inp.value), inp.unit),
                     _chip(inp.confidence),
                     _e(
                         "%s–%s" % (fmt_multiple(low), fmt_multiple(high))
@@ -1412,6 +1415,7 @@ td.n:not(:last-child), th.n:not(:last-child) { padding-right: 16px; }
 td.nowrap { white-space: nowrap; overflow-wrap: normal; }
 td.n.wrap { min-width: 6em; }
 td.n .long { white-space: normal; overflow-wrap: anywhere; }
+td.n .long .fig { white-space: nowrap; }
 td.label { min-width: 8em; }
 td.src { color: var(--ink-2); min-width: 200px; overflow-wrap: anywhere; }
 td .under { display: block; color: var(--muted); font-size: 12px; }

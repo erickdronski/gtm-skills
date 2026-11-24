@@ -864,12 +864,43 @@ class TestEdgeCases(unittest.TestCase):
             raw = json.load(handle)
         unit = "minutes saved per ticket on suggested-reply acceptance"
         raw["drivers"][1]["inputs"]["minutes_saved"]["unit"] = unit
-        self.assertIn('<span class="long">1.8 %s</span>' % unit, render(raw))
+        self.assertIn(
+            '<span class="long"><span class="fig">1.8</span> %s</span>' % unit,
+            render(raw),
+        )
         # Every value the example has stays on one line on a wide screen.
         self.assertNotIn('<span class="long">', load_spec(EXAMPLE).to_html())
         # The rule that lets it wrap is top-level (rules inside @media blocks
         # are indented), so it holds at every width, not only narrow ones.
         self.assertIn("\ntd.n .long { white-space: normal;", report.CSS)
+
+    def test_a_long_value_wraps_around_its_figure_not_through_it(self):
+        """With the value free to break anywhere, a squeezed column showed
+        "48,000,0" on one line and "00 USD of" on the next at 761-839px."""
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        raw["drivers"][2]["formula"] += " + annual_revenue * churn_reduction"
+        raw["drivers"][2]["inputs"].update(
+            annual_revenue={
+                "value": 48000000,
+                "unit": "USD of annual recurring revenue",
+                "confidence": "fact",
+                "source": "FY25 audited revenue, finance close pack",
+            },
+            churn_reduction={
+                "value": 0.002,
+                "confidence": "assumption",
+                "source": "Observed 0.1-0.4 points at two reference customers",
+                "low": 0.001,
+                "high": 0.004,
+            },
+        )
+        self.assertIn(
+            '<span class="long"><span class="fig">48,000,000</span> '
+            "USD of annual recurring revenue</span>",
+            render(raw),
+        )
+        self.assertIn("\ntd.n .long .fig { white-space: nowrap; }", report.CSS)
 
     def test_long_currency_codes_turn_the_cash_table_into_cards(self):
         html = render(edge_cases()["currency code"])
