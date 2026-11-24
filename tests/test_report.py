@@ -746,8 +746,54 @@ class TestEdgeCases(unittest.TestCase):
         html = render(edge_cases()["all-positive cash flows"])
         self.assertIn('<div class="value num long">immediate</div>', html)
         northwind = load_spec(EXAMPLE).to_html()
-        self.assertIn('<div class="value num">2 yr 4 mo</div>', northwind)
-        self.assertIn('<div class="value num">32%</div>', northwind)
+        self.assertRegex(northwind, r'<div class="value num fit"[^>]*>2 yr 4 mo</div>')
+        self.assertRegex(northwind, r'<div class="value num fit"[^>]*>32%</div>')
+
+    def test_tile_figures_shrink_to_fit_rather_than_wrap(self):
+        """At 320-360px a tile gives its figure 113-133px: "CHF 579.7k" broke
+        before "579.7k", "CA$115.9M" inside the number, and "1 yr 11 mo"
+        left "mo" alone on a line."""
+
+        def tiles(html):
+            return re.findall(
+                r'<div class="kpi"><div class="label">([^<]*)</div>'
+                r'<div class="value ([^"]*)"(?: style="--fit: ([\d.]+)")?>([^<]*)<',
+                html,
+            )
+
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            northwind = json.load(handle)
+        chf = deepcopy(northwind)
+        chf["currency"] = "CHF"
+        chf["shared_inputs"]["deflection_rate"]["value"] = 0.224
+        cad = deepcopy(northwind)
+        cad["currency"] = "CAD"
+        for cost in cad["costs"]:
+            cost["schedule"] = [200 * v for v in cost["schedule"]]
+        cad["shared_inputs"]["tickets_per_year"]["value"] *= 200
+        seen = set()
+        for raw in (northwind, chf, cad, *edge_cases().values()):
+            for label, classes, fit, text in tiles(render(raw)):
+                text = unescape(text)
+                seen.add(text)
+                with self.subTest(label=label, text=text):
+                    if "long" in classes.split():
+                        self.assertFalse(any(ch.isdigit() for ch in text))
+                        continue
+                    self.assertEqual(classes, "num fit")
+                    # At --fit cqi the estimated width of the figure, with the
+                    # -0.02em tracking, fills no more than its tile.
+                    ems = report._text_width(text, 1.0) - 0.02 * len(text)
+                    self.assertLessEqual(float(fit) * ems, 100.0)
+        for text in ("CHF 579.7k", "CA$115.9M", "1 yr 11 mo", "2 yr 4 mo"):
+            self.assertIn(text, seen)
+        css = report.CSS.split("@supports (width: 1cqi) {", 1)[1].split("}", 2)
+        self.assertIn(
+            ".kpi .value.fit { font-size: min(25px, calc(var(--fit) * 1cqi)); "
+            "white-space: nowrap;",
+            css[1],
+        )
+        self.assertRegex(report.CSS, r"\n\.kpi \{[^}]*container-type: inline-size;")
 
     def test_no_ranges_explains_instead_of_charting(self):
         html = render(edge_cases()["no sensitivity rows"])

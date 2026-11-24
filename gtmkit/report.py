@@ -434,11 +434,8 @@ def _headline(case: Any) -> str:
     (npv_label, npv_text), tiles, (_, safety) = rows[0], rows[1:-1], rows[-1]
     size = "" if len(npv_text) <= 8 else (" l2" if len(npv_text) <= 11 else " l3")
     # The hero figure must stay on one line in any width its cell gets, a
-    # narrow window or a printed page included. Its estimated width in ems
-    # (less the -0.035em tracking) gives the largest font, in cqi of the cell,
-    # that still fits; CSS caps it at the design size.
-    ems = _text_width(npv_text, 1.0) - 0.035 * len(npv_text)
-    fit = math.floor(1000.0 / max(ems, 1.0)) / 10
+    # narrow window or a printed page included; CSS caps it at the design size.
+    fit = _fit(npv_text, 0.035)
     sub = "Base case, %d year%s at %s" % (
         case.horizon,
         "" if case.horizon == 1 else "s",
@@ -452,15 +449,23 @@ def _headline(case: Any) -> str:
         % (_e(npv_label), size, fit, _e(npv_text), _e(sub)),
     ]
     for label, text in tiles:
-        # A sentence such as "never within the modeled horizon" is the honest
-        # value for some cases; it gets a text size rather than a truncation.
-        # So does a value in words ("immediate", "n/a"): at figure size one
-        # word can outgrow a 320px phone's tile, and must not break mid-word.
-        words = not any(ch.isdigit() for ch in text)
-        long = " long" if len(text) > 14 or words else ""
+        if not any(ch.isdigit() for ch in text):
+            # A sentence such as "never within the modeled horizon" is the
+            # honest value for some cases; it gets a text size rather than a
+            # truncation. So does a value in words ("immediate", "n/a"): at
+            # figure size one word can outgrow a 320px phone's tile.
+            value = '<div class="value num long">%s</div>' % _e(text)
+        else:
+            # A figure stays on one line as the hero does, shrinking with its
+            # tile where it must: "CHF 579.7k", "CA$115.9M" and "1 yr 11 mo"
+            # are wider than a 320px phone's tile at 25px.
+            value = '<div class="value num fit" style="--fit: %s">%s</div>' % (
+                _fit(text, 0.02),
+                _e(text),
+            )
         out.append(
-            '<div class="kpi"><div class="label">%s</div>'
-            '<div class="value num%s">%s</div></div>\n' % (_e(label), long, _e(text))
+            '<div class="kpi"><div class="label">%s</div>%s</div>\n'
+            % (_e(label), value)
         )
     out.append("</section>\n")
     end = "" if safety.endswith((".", "!", "?")) else "."
@@ -468,6 +473,17 @@ def _headline(case: Any) -> str:
         '<p class="safety"><b>Margin of safety:</b> %s%s</p>\n' % (_e(safety), end)
     )
     return "".join(out)
+
+
+def _fit(text: str, tracking: float) -> float:
+    """The largest font size, in cqi of its cell, at which ``text`` fits.
+
+    From the text's estimated width in ems, less its letter-spacing
+    (``tracking`` em per character). The estimate errs wide, so at this size
+    the figure fits on one line in any width its cell gets.
+    """
+    ems = _text_width(text, 1.0) - tracking * len(text)
+    return math.floor(1000.0 / max(ems, 1.0)) / 10
 
 
 def _evidence(data: Mapping[str, Any], labels: Mapping[str, str]) -> str:
@@ -1327,7 +1343,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; ov
 
 /* Headline: one hero figure, the rest are stat tiles. */
 .kpis { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 0; padding: 0; overflow: hidden; }
-.kpi { padding: 20px 22px 18px; border-left: 1px solid var(--border); border-top: 1px solid var(--border); min-width: 0; }
+.kpi { padding: 20px 22px 18px; border-left: 1px solid var(--border); border-top: 1px solid var(--border); min-width: 0; container-type: inline-size; }
 .kpi.hero { grid-row: 1 / span 2; border-left: 0; border-top: 0; display: flex; flex-direction: column; justify-content: center; padding: 26px 26px 24px; container-type: inline-size; }
 .kpi:nth-child(2), .kpi:nth-child(3) { border-top: 0; }
 .kpi .label { font-size: 12.5px; color: var(--ink-2); }
@@ -1336,10 +1352,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; ov
 .kpi.hero .value { font-size: 60px; letter-spacing: -0.035em; line-height: 1; margin-top: 10px; }
 .kpi.hero .value.l2 { font-size: 46px; }
 .kpi.hero .value.l3 { font-size: 34px; }
-/* Where container units work, the hero figure shrinks with its cell (--fit is
-   set from its length) rather than break mid-number; elsewhere the sizes above. */
+/* Where container units work, the hero figure and each tile's figure shrink
+   with their cell (--fit is set from their length) rather than break across
+   lines; elsewhere the sizes above. */
 @supports (width: 1cqi) {
   .kpi.hero .value.num { font-size: min(60px, calc(var(--fit) * 1cqi)); }
+  .kpi .value.fit { font-size: min(25px, calc(var(--fit) * 1cqi)); white-space: nowrap; }
 }
 .kpi .sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
 .safety { margin: 14px 2px 0; color: var(--ink-2); }
