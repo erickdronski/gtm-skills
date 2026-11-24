@@ -34,6 +34,7 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from .cli import emit
 from .fmt import fmt_count, fmt_currency, table
 
 __all__ = ["PricingError", "analyze", "main"]
@@ -384,13 +385,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     output = (
         json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

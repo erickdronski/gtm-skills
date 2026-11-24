@@ -38,6 +38,7 @@ import re
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from .cli import emit
 from .evidence import EvidenceError, grade_evidence, validate_input
 from .fmt import fmt_currency, fmt_pct, table
 from .scoring import RubricError, load_records
@@ -1267,13 +1268,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     output = (
         json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -64,6 +64,7 @@ import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from . import finance
+from .cli import emit
 from .evidence import (
     EvidenceError,
     Input,
@@ -837,6 +838,13 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
             "at least the subscription and the implementation effort."
         )
 
+    meta = spec.get("meta") or {}
+    if not isinstance(meta, Mapping):
+        raise SpecError(
+            "'meta' must be an object, e.g. "
+            '{"prepared_for": "...", "decision_date": "2026-09-30"}'
+        )
+
     return ValueCase(
         name=name,
         currency=currency,
@@ -844,7 +852,7 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
         discount_rate=float(rate),
         drivers=drivers,
         costs=costs,
-        meta=spec.get("meta") or {},
+        meta=meta,
     )
 
 
@@ -1010,6 +1018,10 @@ def load_spec(path: str) -> ValueCase:
         raise SpecError("no such spec file: %s" % path)
     except json.JSONDecodeError as exc:
         raise SpecError("%s is not valid JSON: %s" % (path, exc)) from exc
+    except UnicodeDecodeError as exc:
+        raise SpecError("%s is not UTF-8 text: %s" % (path, exc)) from exc
+    except OSError as exc:
+        raise SpecError("cannot read %s: %s" % (path, exc.strerror or exc)) from exc
     return validate_spec(raw)
 
 
@@ -1050,7 +1062,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         case = load_spec(args.spec)
-    except (SpecError, EvidenceError, ExpressionError) as exc:
+        # Building the whole model is part of the check: a range bound that
+        # divides by zero is only reached when the sensitivity runs.
+        model = case.to_dict()
+        if args.check:
+            output = ""
+        elif args.format == "json":
+            output = json.dumps(model, indent=2, sort_keys=False)
+        elif args.format == "html":
+            output = case.to_html()
+        else:
+            output = case.to_markdown()
+    except (
+        SpecError,
+        EvidenceError,
+        ExpressionError,
+        finance.InvalidCashFlows,
+    ) as exc:
         sys.stderr.write("spec error: %s\n" % exc)
         return 2
 
@@ -1060,21 +1088,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             % (args.spec, len(case.drivers), len(case.costs), case.horizon)
         )
         return 0
-
-    if args.format == "json":
-        output = json.dumps(case.to_dict(), indent=2, sort_keys=False)
-    elif args.format == "html":
-        output = case.to_html()
-    else:
-        output = case.to_markdown()
-
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

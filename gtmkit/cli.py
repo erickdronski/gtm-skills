@@ -25,7 +25,7 @@ from typing import Optional, Sequence, Tuple
 
 from . import __version__
 
-__all__ = ["ANALYSES", "STARTERS", "main", "starter_bytes"]
+__all__ = ["ANALYSES", "STARTERS", "emit", "main", "starter_bytes"]
 
 # (name, what it does, example arguments). The name is the module name, so
 # every entry also runs as ``python3 -m gtmkit.<name>``.
@@ -90,6 +90,26 @@ STARTERS: Tuple[Tuple[str, str, str, str], ...] = (
         "gtmkit sizing --spec {path}",
     ),
 )
+
+
+def emit(text: str, out: Optional[str]) -> int:
+    """Print an analysis's output, or write it to ``out``; return the exit code.
+
+    Every analysis's ``--out`` goes through here. A file that cannot be written
+    (most often a directory name with a typo) is one line on stderr and exit
+    status 1, as with ``gtmkit init``, rather than a traceback.
+    """
+    if not out:
+        sys.stdout.write(text + "\n")
+        return 0
+    try:
+        with open(out, "w", encoding="utf-8") as handle:
+            handle.write(text + "\n")
+    except OSError as exc:
+        sys.stderr.write("error: cannot write %s: %s\n" % (out, exc.strerror or exc))
+        return 1
+    sys.stderr.write("wrote %s\n" % out)
+    return 0
 
 
 def starter_bytes(kind: str) -> bytes:

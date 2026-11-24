@@ -218,5 +218,75 @@ class TestInit(unittest.TestCase):
         self.assertTrue(out.getvalue().strip())
 
 
+def example(*parts):
+    return os.path.join(REPO_ROOT, "examples", *parts)
+
+
+# Arguments that make each analysis with an --out option produce output.
+WRITERS = {
+    "valuecase": [NORTHWIND],
+    "scoring": [
+        "--rubric",
+        example("icp", "rubric.json"),
+        "--records",
+        example("icp", "accounts.csv"),
+    ],
+    "sizing": ["--spec", example("sizing", "agent-observability-na.json")],
+    "pricing": ["--responses", example("pricing", "responses.csv")],
+    "qualify": [example("deal", "kestrel-expansion.json")],
+    "pipeline": [
+        example("pipeline", "pipeline.csv"),
+        "--stages",
+        example("pipeline", "stages.json"),
+        "--target",
+        "1200000",
+        "--as-of",
+        "2026-10-06",
+    ],
+}
+
+
+class TestOut(unittest.TestCase):
+    """Every --out reports a file it cannot write; none raises a traceback."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_every_analysis_with_out_is_covered(self):
+        with_out = [
+            name
+            for name in ANALYSIS_NAMES
+            if "--out" in (validate_skills.module_flags(name) or ())
+        ]
+        self.assertEqual(sorted(with_out), sorted(WRITERS))
+
+    def test_a_missing_directory_is_one_line_and_exit_1(self):
+        for name, args in WRITERS.items():
+            target = os.path.join(self.tmp.name, "missing", "%s.out" % name)
+            with self.subTest(analysis=name):
+                code, out, err = run([name, *args, "--out", target])
+                self.assertEqual(code, 1)
+                self.assertEqual(out, "")
+                self.assertEqual(
+                    err, "error: cannot write %s: No such file or directory\n" % target
+                )
+                self.assertFalse(os.path.exists(target))
+
+    def test_writes_the_file_and_says_where(self):
+        for name, args in WRITERS.items():
+            target = os.path.join(self.tmp.name, "%s.out" % name)
+            with self.subTest(analysis=name):
+                code, out, err = run([name, *args, "--out", target])
+                self.assertEqual((code, out, err), (0, "", "wrote %s\n" % target))
+                with open(target, encoding="utf-8") as handle:
+                    self.assertTrue(handle.read().strip())
+
+    def test_emit_prints_without_a_destination(self):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(cli.emit("text", None), 0)
+        self.assertEqual(out.getvalue(), "text\n")
+
+
 if __name__ == "__main__":
     unittest.main()

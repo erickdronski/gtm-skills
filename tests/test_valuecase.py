@@ -5,11 +5,15 @@ a repo whose README shows numbers the code no longer produces is worse than one
 with no README at all.
 """
 
+import contextlib
+import io
 import json
 import os
+import tempfile
 import unittest
 from copy import deepcopy
 
+from gtmkit import valuecase
 from gtmkit.valuecase import SpecError, load_spec, validate_spec
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -358,6 +362,41 @@ class TestSpecValidation(unittest.TestCase):
         with self.assertRaises(SpecError) as ctx:
             validate_spec(spec)
         self.assertIn("d1", str(ctx.exception))
+
+
+class TestCommandLineErrors(unittest.TestCase):
+    """Problems found while loading or computing a spec are one line, exit 2."""
+
+    def test_a_range_bound_that_breaks_the_formula_is_a_spec_error(self):
+        raw = minimal_spec()
+        raw["drivers"][0]["formula"] = "volume * unit_value / rate"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "case.json")
+            raw["drivers"][0]["inputs"]["rate"]["low"] = 0
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(raw, handle)
+            for extra in (["--check"], ["--format", "html"]):
+                with self.subTest(args=extra):
+                    out, err = io.StringIO(), io.StringIO()
+                    with (
+                        contextlib.redirect_stdout(out),
+                        contextlib.redirect_stderr(err),
+                    ):
+                        self.assertEqual(valuecase.main([path, *extra]), 2)
+                    self.assertEqual(out.getvalue(), "")
+                    self.assertIn("spec error: division by zero", err.getvalue())
+
+    def test_meta_must_be_an_object(self):
+        for meta in ("draft", ["draft"], 3):
+            with self.subTest(meta=meta), self.assertRaises(SpecError):
+                validate_spec(minimal_spec(meta=meta))
+
+    def test_unreadable_spec_is_a_spec_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(valuecase.main([tmp, "--check"]), 2)
+            self.assertIn("spec error: cannot read", err.getvalue())
 
 
 class TestShippedExample(unittest.TestCase):

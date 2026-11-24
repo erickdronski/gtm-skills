@@ -12,6 +12,8 @@ import json
 import math
 import os
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from copy import deepcopy
@@ -756,6 +758,31 @@ class TestCommandLine(unittest.TestCase):
                 self.assertEqual(handle.read(), written)
             self.assertEqual(written, load_spec(EXAMPLE).to_html() + "\n")
             self.assertIn("wrote", err.getvalue())
+
+    def test_unwritable_out_is_a_message_not_a_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = os.path.join(tmp, "no such folder", "case.html")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                code = valuecase.main([EXAMPLE, "--format", "html", "--out", target])
+            self.assertEqual(code, 1)
+            self.assertIn("cannot write %s" % target, err.getvalue())
+            self.assertFalse(os.path.exists(target))
+            # The same through the gtmkit front door, in its own process.
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    *("-m", "gtmkit", "valuecase", EXAMPLE),
+                    *("--format", "html", "--out", target),
+                ],
+                cwd=REPO_ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(b"cannot write", result.stderr)
+            self.assertNotIn(b"Traceback", result.stderr)
 
     def test_json_output_is_unchanged_by_the_html_option(self):
         out = io.StringIO()

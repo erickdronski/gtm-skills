@@ -50,6 +50,7 @@ import json
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from .cli import emit
 from .fmt import fmt_pct, table
 
 __all__ = ["Rubric", "RubricError", "main", "score_all", "score_record"]
@@ -541,13 +542,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         else to_markdown(rubric, scored, args.name_field)
     )
 
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover
