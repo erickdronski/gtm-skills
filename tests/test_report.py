@@ -415,6 +415,13 @@ class TestDocument(unittest.TestCase):
         for cost in self.case.costs:
             self.assertIn(">%s<" % cost.label, self.html)
 
+    def test_footer_claims_only_the_computed_figures(self):
+        footer = unescape(re.search(r"<footer>(.*?)</footer>", self.html).group(1))
+        self.assertIn(report.PROVENANCE, footer)
+        self.assertNotIn("by hand", footer)
+        # Why it cannot claim more: the ledger prints the spec's own inputs.
+        self.assertIn(">124,800 tickets<", self.html)
+
     def test_deterministic(self):
         again = load_spec(EXAMPLE).to_html()
         self.assertEqual(again, self.html)
