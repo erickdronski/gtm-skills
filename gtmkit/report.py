@@ -888,7 +888,7 @@ def _cash_flow(case: Any, data: Mapping[str, Any], money: _Money) -> str:
     # Five columns fit a 375px phone at the compact size unless the amounts
     # are long (a code such as "CHF " before each one); then every period
     # becomes a card of four labelled values on any phone.
-    needed = PHONE_CELL_PADDING + sum(
+    needed = PHONE_CELL_PADDING + math.fsum(
         max([_text_width(h, 11.0)] + [_text_width(row[i], 12.0) for row in texts])
         for i, (h, _) in enumerate(headers)
     )
@@ -1267,7 +1267,7 @@ def _ledger(case: Any) -> str:
 
 def _costs(case: Any, money: _Money) -> str:
     rows = [
-        [_e(cost.label), _e(money(sum(cost.schedule))), _e(cost.note or "")]
+        [_e(cost.label), _e(money(math.fsum(cost.schedule))), _e(cost.note or "")]
         for cost in case.costs
     ]
     return (

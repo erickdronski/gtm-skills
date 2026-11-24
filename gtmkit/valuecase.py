@@ -206,7 +206,7 @@ class Driver:
                 moved = base
             movements[name] = abs(moved - base)
 
-        total = sum(movements.values())
+        total = math.fsum(movements.values())
         if total <= 0:
             # Degenerate driver (constant formula, or all inputs inert).
             # Split evenly rather than divide by zero.
@@ -738,7 +738,7 @@ class ValueCase:
             cost_rows = [
                 [
                     cost.label,
-                    fmt_currency(sum(cost.schedule), cur),
+                    fmt_currency(math.fsum(cost.schedule), cur),
                     cost.note or "",
                 ]
                 for cost in self.costs

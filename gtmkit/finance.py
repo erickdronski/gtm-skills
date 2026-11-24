@@ -17,6 +17,11 @@ Conventions used throughout:
 * Rates are decimals per period, not percentages. 12% is ``0.12``.
 * Anything that cannot be computed honestly returns ``None`` rather than a
   fabricated number. A missing IRR is information; a made-up IRR is a liability.
+* Totals of floats use :func:`math.fsum`, never the built-in ``sum``. From
+  Python 3.12 ``sum`` adds floats with compensated summation, so the same
+  flows totalled differently in their last bits on 3.9-3.11 and on 3.12+,
+  and a total on a rounding boundary printed differently ($619.4k against
+  $619.5k). ``fsum`` is exactly rounded on every version.
 """
 
 from __future__ import annotations
@@ -96,7 +101,7 @@ def npv(rate: float, cash_flows: Sequence[float]) -> float:
     if you are reconciling against someone's spreadsheet, check this first.
     """
     flows = _validate(cash_flows)
-    return sum(present_value(value, rate, i) for i, value in enumerate(flows))
+    return math.fsum(present_value(value, rate, i) for i, value in enumerate(flows))
 
 
 def irr(
@@ -219,8 +224,8 @@ def roi(cash_flows: Sequence[float]) -> Optional[float]:
     number.
     """
     flows = _validate(cash_flows)
-    costs = sum(-v for v in flows if v < 0)
-    benefits = sum(v for v in flows if v > 0)
+    costs = math.fsum(-v for v in flows if v < 0)
+    benefits = math.fsum(v for v in flows if v > 0)
     if costs == 0:
         return None
     return (benefits - costs) / costs
@@ -264,8 +269,12 @@ def break_even_value(
     if period_weights is not None and len(period_weights) != len(flows):
         raise InvalidCashFlows("period_weights must match cash_flows length")
 
-    cost_npv = sum(present_value(v, rate, i) for i, v in enumerate(flows) if v < 0)
-    benefit_npv = sum(present_value(v, rate, i) for i, v in enumerate(flows) if v > 0)
+    cost_npv = math.fsum(
+        present_value(v, rate, i) for i, v in enumerate(flows) if v < 0
+    )
+    benefit_npv = math.fsum(
+        present_value(v, rate, i) for i, v in enumerate(flows) if v > 0
+    )
     if benefit_npv <= 0:
         return None
     multiplier = -cost_npv / benefit_npv
@@ -292,8 +301,10 @@ def break_even_multiplier(
     breaks even". Returns ``None`` when benefits have no present value to
     shrink, and ``0.0`` when the case clears zero with no benefits at all.
     """
-    benefit_npv = sum(present_value(v, rate, i) for i, v in enumerate(benefit_flows))
-    cost_npv = sum(present_value(v, rate, i) for i, v in enumerate(cost_flows))
+    benefit_npv = math.fsum(
+        present_value(v, rate, i) for i, v in enumerate(benefit_flows)
+    )
+    cost_npv = math.fsum(present_value(v, rate, i) for i, v in enumerate(cost_flows))
     if benefit_npv <= 0:
         return None
     if cost_npv <= 0:
@@ -320,12 +331,12 @@ def summarize(
     internal = irr(flows)
 
     if benefit_flows is not None and cost_flows is not None:
-        total_benefit = sum(benefit_flows)
-        total_investment = sum(cost_flows)
+        total_benefit = math.fsum(benefit_flows)
+        total_investment = math.fsum(cost_flows)
         break_even = break_even_multiplier(rate, benefit_flows, cost_flows)
     else:
-        total_benefit = sum(v for v in flows if v > 0)
-        total_investment = sum(-v for v in flows if v < 0)
+        total_benefit = math.fsum(v for v in flows if v > 0)
+        total_investment = math.fsum(-v for v in flows if v < 0)
         break_even = break_even_value(rate, flows)
 
     return {
@@ -335,7 +346,7 @@ def summarize(
         "discount_rate_annual": annualized_rate(rate, periods_per_year),
         "total_investment": total_investment,
         "total_benefit": total_benefit,
-        "net_cash": sum(flows),
+        "net_cash": math.fsum(flows),
         "npv": net_present,
         "irr_per_period": internal,
         "irr_annual": (

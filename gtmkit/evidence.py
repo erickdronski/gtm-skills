@@ -281,7 +281,7 @@ def grade_evidence(
             raise EvidenceError("evidence contributions must be finite numbers")
         pairs.append((confidence, abs(float(value))))
 
-    total = sum(value for _, value in pairs)
+    total = math.fsum(value for _, value in pairs)
     shares = dict.fromkeys(CONFIDENCE_LEVELS, 0.0)
     for confidence, value in pairs:
         shares[confidence] += value

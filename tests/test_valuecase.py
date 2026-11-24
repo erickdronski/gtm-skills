@@ -644,6 +644,36 @@ class TestShippedExample(unittest.TestCase):
                 self.assertNotIn("||", line)
 
 
+class TestSameOutputOnEveryPython(unittest.TestCase):
+    """Identical input gives identical bytes on every supported Python."""
+
+    def test_a_total_on_a_rounding_boundary_prints_the_same_everywhere(self):
+        """Python 3.9 summed these cents to 619449.9999999999 ($619.4k) and
+        3.12 to 619450.0 ($619.5k), in the headline and the cost table."""
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        raw["costs"] = [
+            {
+                "id": "all",
+                "label": "All costs",
+                "schedule": [69151.48, 166414.54, 318846.41, 65037.57],
+            }
+        ]
+        case = validate_spec(raw)
+        self.assertEqual(case.summary()["total_investment"], 619450.0)
+        self.assertEqual(dict(case.headline())["Total investment"], "$619.5k")
+        self.assertRegex(case.to_markdown(), r"\| All costs \| \$619\.5k +\|")
+        html = case.to_html()
+        self.assertIn(">$619.5k</div>", html)
+        self.assertIn('data-label="Total">$619.5k</td>', html)
+
+    def test_the_example_model_is_exactly_the_same(self):
+        """3.9 wrote "swing": 311568.8939999999 where 3.12 wrote 311568.894."""
+        case = load_spec(EXAMPLE)
+        self.assertEqual(repr(case.sensitivity()[0]["swing"]), "311568.894")
+        self.assertEqual(repr(case.summary()["npv"]), "105193.0378578717")
+
+
 class TestAdverseBounds(unittest.TestCase):
     def test_inverse_input_high_bound_can_reverse_the_decision(self):
         spec = minimal_spec(horizon_years=1, discount_rate_annual=0)

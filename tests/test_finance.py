@@ -230,6 +230,29 @@ class TestSummarize(unittest.TestCase):
             self.assertIn(key, result)
 
 
+class TestTotalsAreTheSameOnEveryPython(unittest.TestCase):
+    """From Python 3.12 the built-in sum() adds floats with compensated
+    summation, so totals differed in their last bits between 3.9-3.11 and
+    3.12+, and one on a rounding boundary printed as $619.4k on one and
+    $619.5k on the other. Totals are exactly rounded (math.fsum) instead."""
+
+    # Four cost years in cents that add up to exactly 619,450.00.
+    CENTS = (69151.48, 166414.54, 318846.41, 65037.57)
+
+    def test_npv_and_totals_are_exactly_rounded(self):
+        self.assertEqual(finance.npv(0.0, self.CENTS), 619450.0)
+        benefits = [0.0, 400000.0, 400000.0, 400000.0]
+        summary = finance.summarize(
+            [b - c for b, c in zip(benefits, self.CENTS)],
+            0.0,
+            benefit_flows=benefits,
+            cost_flows=self.CENTS,
+        )
+        self.assertEqual(summary["total_investment"], 619450.0)
+        self.assertEqual(summary["net_cash"], 1200000.0 - 619450.0)
+        self.assertEqual(finance.roi([*(-v for v in self.CENTS), 619450.0]), 0.0)
+
+
 class TestFiniteFinance(unittest.TestCase):
     def test_cash_flows_and_discount_rates_must_be_finite(self):
         for value in (float("nan"), float("inf"), -float("inf")):

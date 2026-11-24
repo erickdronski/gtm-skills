@@ -57,6 +57,10 @@ renders as an HTML report to share.
 - A floor NPV of exactly zero is no longer called negative: the verdict now
   says the case does not clear zero at the floor. A case with no cost says it
   breaks even with no benefits at all, not that it clears zero.
+- A value case's markdown, HTML and JSON are the same on every supported
+  Python. Its totals are now exactly rounded (`math.fsum`): Python 3.12's
+  `sum()` adds floats differently from 3.9-3.11, so a total on a rounding
+  boundary could print as $619.4k on one and $619.5k on the other.
 
 ### Skills
 
