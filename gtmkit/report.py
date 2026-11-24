@@ -77,13 +77,20 @@ THIN_SEGMENT = 0.12
 PHONE_CONTENT_WIDTH = 313.0
 PHONE_CELL_PADDING = 24.0
 
-# The tornado's axis is at its narrowest in the narrowest window each layout
-# serves: 320px for the phone layout and 761px for the wide one. These mirror
-# the stylesheet: page padding, section padding and border, the name column,
+# The tornado labels its axis afresh for each range of window widths, so a
+# window is never left with fewer labels than it has room for just because a
+# narrower one shares its layout: a 760px phone layout has a 558px axis where
+# 320px has 118px. Each range is named by its narrowest window, where its axis
+# is narrowest; the ranges run from there to the next wider one, and paper is
+# set like a 761px window. The stylesheet's rules for them come from this list
+# (_axis_css).
+AXIS_TIERS = (1001, 761, 600, 480, 375, 320)
+# These mirror the stylesheet: the first window of the wide layout, the
+# report's widest, page padding, section padding and border, the name column,
 # and the least each gutter beside the plot takes (--gut). A test holds them
 # to the CSS.
-PHONE_MIN_WINDOW = 320.0
-WIDE_MIN_WINDOW = 761.0
+WIDE_MIN_WINDOW = 761
+REPORT_MAX_WIDTH = 980.0
 _PAGE_PAD = {"phone": 14.0, "wide": 28.0}
 _SECTION_PAD = {"phone": 16.0, "wide": 26.0}
 _SECTION_BORDER = 1.0
@@ -608,27 +615,37 @@ def _sensitivity(
     return "".join(out)
 
 
-def tornado_axis_width(layout: str, tip: int) -> float:
-    """The tornado axis in px at the narrowest window ``layout`` serves.
+def tornado_axis_width(window: float, tip: int) -> float:
+    """The tornado axis in px in a window ``window`` px wide.
 
-    ``layout`` is "phone" or "wide"; ``tip`` is the chart's --tip gutter in px.
+    ``tip`` is the chart's --tip gutter in px. The phone layout serves windows
+    up to 760px, the wide one the rest, and the report stops growing at 980px.
     """
-    window = PHONE_MIN_WINDOW if layout == "phone" else WIDE_MIN_WINDOW
-    content = window - 2 * (_PAGE_PAD[layout] + _SECTION_PAD[layout] + _SECTION_BORDER)
+    layout = "wide" if window >= WIDE_MIN_WINDOW else "phone"
+    page = min(float(window), REPORT_MAX_WIDTH)
+    content = page - 2 * (_PAGE_PAD[layout] + _SECTION_PAD[layout] + _SECTION_BORDER)
     gutter = max(_MIN_GUTTER[layout], float(tip))
     return content * (1 - _NAME_COLUMN[layout]) - 2 * gutter
 
 
-def _label_stride(widest: float, step_px: float, count: int, every: int = 1) -> int:
+def _label_stride(widths: Sequence[float], start: int, step_px: float) -> int:
     """How many ticks apart axis labels must sit so neighbours never touch.
 
-    The smallest multiple of ``every`` whose spacing clears the widest label
-    plus AXIS_GAP. ``count`` or more leaves a single label.
+    ``widths`` are the estimated widths of every tick's label, ``start`` the
+    tick labelled first (zero when the axis has it) and ``step_px`` the space
+    between ticks. The smallest stride k at which each pair of neighbours,
+    k ticks apart, clears half of each label's own width plus AXIS_GAP: so the
+    most labels that fit. A stride that leaves one label always fits.
     """
-    stride = every
-    while stride < count and stride * step_px < widest + AXIS_GAP:
-        stride += every
-    return stride
+    count = len(widths)
+    for stride in range(1, count):
+        shown = [i for i in range(count) if (i - start) % stride == 0]
+        if all(
+            stride * step_px - (widths[a] + widths[b]) / 2 >= AXIS_GAP
+            for a, b in zip(shown, shown[1:])
+        ):
+            return stride
+    return max(count, 1)
 
 
 def _rounding_step(rows: Sequence[Mapping[str, Any]], base: float) -> float:
@@ -760,21 +777,23 @@ def _tornado(
     gutter = max([_text_width(t, 12.5) for t in tips] or [0.0]) + 14
     tip = math.ceil(gutter)
     # Label every k-th tick, counted from zero when the axis has it, with k as
-    # small as the narrowest window of each layout allows. A phone labels a
-    # subset of the ticks a wide window labels, and hides the other gridlines.
-    widest = max([_text_width(text, AXIS_FONT) for _, text in ticks] or [0.0])
+    # small as the narrowest window of each range in AXIS_TIERS allows. A tick
+    # a range has no room for carries that range's class ("h375" for 375-479px)
+    # and loses its label and gridline there; one no range labels is left out.
+    widths = [_text_width(text, AXIS_FONT) for _, text in ticks]
     at = [t for t, _ in ticks]
     start = at.index(0.0) if 0.0 in at else 0
-    step_px = {
-        layout: tornado_axis_width(layout, tip) * scale.step / (scale.hi - scale.lo)
-        for layout in ("wide", "phone")
-    }
-    every = _label_stride(widest, step_px["wide"], len(ticks))
-    every_phone = _label_stride(widest, step_px["phone"], len(ticks), every)
+    hidden: Dict[int, List[str]] = {i: [] for i in range(len(ticks))}
+    for window in AXIS_TIERS:
+        step_px = tornado_axis_width(window, tip) * scale.step / (scale.hi - scale.lo)
+        stride = _label_stride(widths, start, step_px)
+        for i in hidden:
+            if (i - start) % stride:
+                hidden[i].append("h%d" % window)
     shown = [
-        (t, text, (i - start) % every_phone == 0)
+        (t, text, hidden[i])
         for i, (t, text) in enumerate(ticks)
-        if (i - start) % every == 0
+        if len(hidden[i]) < len(AXIS_TIERS)
     ]
     caption = (
         "Net present value when one input moves to the low or high end of its "
@@ -795,13 +814,13 @@ def _tornado(
     anchor = "start" if base_at < 0.18 else ("end" if base_at > 0.82 else "mid")
     lines = "".join(
         '<i%s style="left: %s"></i>'
-        % (_class_attr("zero" if t == 0 else "", "" if phone else "wide"), _pc(frac(t)))
-        for t, _, phone in shown
+        % (_class_attr("zero" if t == 0 else "", *gone), _pc(frac(t)))
+        for t, _, gone in shown
     )
     axis = "".join(
         '<span%s style="left: %s">%s</span>'
-        % (_class_attr("" if phone else "wide"), _pc(frac(t)), _e(text))
-        for t, text, phone in shown
+        % (_class_attr(*gone), _pc(frac(t)), _e(text))
+        for t, text, gone in shown
     )
     aria = (
         "Tornado chart of net present value at the low and high end of each ranged input, against a base case of %s. %s."
@@ -1435,6 +1454,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; ov
 .t-top span { position: absolute; bottom: 4px; transform: translateX(-50%); font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .t-top span.start { transform: none; }
 .t-top span.end { transform: translateX(-100%); }
+%(axis)s
 figure { margin: 0; }
 figcaption { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
 figure .legend { margin-top: 10px; }
@@ -1503,8 +1523,6 @@ footer a { color: inherit; }
   .kpi.hero .value.l2 { font-size: 36px; }
   .kpi.hero .value.l3 { font-size: 30px; }
   .tornado { --label: 0%; --gut: max(58px, var(--tip)); }
-  /* Ticks only a wide window has room to label, with their gridlines. */
-  .t-axis span.wide, .t-lines i.wide { display: none; }
   .t-row { grid-template-columns: 1fr; }
   /* The name sits above its bar here; mask the grid lines behind it. */
   .t-name { padding: 10px 0 0; position: relative; z-index: 1; background: var(--surface); }
@@ -1564,6 +1582,38 @@ _CARDS = """\
   table.%(t)s td:first-child { grid-column: 1 / -1; font-weight: 600; }
   table.%(t)s td:first-child::before { content: none; }
 """
-CSS = CSS.replace("%(compact)s", _CARDS % {"t": "compact"}).replace(
-    "%(cards)s", _CARDS % {"t": "compact.cards"}
+
+
+def _axis_css() -> str:
+    """Hide, in each range of AXIS_TIERS, the tick labels it has no room for.
+
+    The rules run from the widest range down, each but the first in a
+    max-width query, so the narrowest range that matches a window comes last
+    and wins: it shows again the ticks the range above it hid, and hides its
+    own. A window between two ranges' bounds (760.5px) still gets one of them.
+    """
+    out = ["/* Tick labels and gridlines each range of widths has no room for. */"]
+    for above, window in zip((None, *AXIS_TIERS), AXIS_TIERS):
+        rules = []
+        if above is not None:
+            rules.append(
+                ".t-axis .h%d, .t-lines .h%d { display: block; }" % (above, above)
+            )
+        rules.append(
+            ".t-axis .h%d, .t-lines .h%d { display: none; }" % (window, window)
+        )
+        if above is None:
+            out.extend(rules)
+            continue
+        query = "screen and (max-width: %dpx)" % (above - 1)
+        if window == WIDE_MIN_WINDOW:
+            query += ", print"
+        out.append("@media %s {\n%s\n}" % (query, "\n".join("  " + r for r in rules)))
+    return "\n".join(out)
+
+
+CSS = (
+    CSS.replace("%(compact)s", _CARDS % {"t": "compact"})
+    .replace("%(cards)s", _CARDS % {"t": "compact.cards"})
+    .replace("%(axis)s", _axis_css())
 )

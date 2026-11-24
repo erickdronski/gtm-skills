@@ -160,14 +160,20 @@ def html_headline(html):
 
 
 def axis_labels(html):
-    """(place along the axis, 0 to 1; text; shown on a phone) per tick label."""
+    """(place along the axis, 0 to 1; text; the width ranges that hide it) per
+    tick label. A range is named by its narrowest window, "h375" for 375px."""
     axis = html.split('<div class="t-axis">', 1)[1].split("</div>", 1)[0]
     return [
-        (float(left) / 100, unescape(text), cls == "")
+        (float(left) / 100, unescape(text), set(cls.split()))
         for cls, left, text in re.findall(
             r'<span(?: class="([^"]*)")? style="left: ([\d.]+)%">([^<]*)</span>', axis
         )
     ]
+
+
+def shown_at(labels, window):
+    """The label texts the width range starting at ``window`` shows."""
+    return [text for _, text, hidden in labels if "h%d" % window not in hidden]
 
 
 def wide_northwind(**changes):
@@ -583,7 +589,8 @@ class TestGeometry(unittest.TestCase):
 
 
 class TestAxisLabels(unittest.TestCase):
-    """Tick labels never run into each other, on a 320px phone or a desktop."""
+    """Tick labels never run into each other at any width from 320px, and each
+    range of widths labels as many ticks as its narrowest window has room for."""
 
     def assert_clear(self, labels, width):
         placed = sorted(
@@ -596,42 +603,70 @@ class TestAxisLabels(unittest.TestCase):
     def check(self, html):
         tip = int(re.search(r'style="--tip: (\d+)px"', html).group(1))
         labels = axis_labels(html)
-        phone = [label for label in labels if label[2]]
-        self.assertTrue(phone, "a phone must keep at least one label")
-        self.assert_clear(labels, report.tornado_axis_width("wide", tip))
-        self.assert_clear(phone, report.tornado_axis_width("phone", tip))
-        # A tick a phone leaves unlabelled loses its gridline there too.
         tornado = html.split('class="tornado"', 1)[1].split("</figure>", 1)[0]
-        self.assertEqual(
-            tornado.count('<i class="wide"'), sum(1 for label in labels if not label[2])
-        )
-        # When the axis has zero, a phone always labels it and keeps its line.
-        zero = re.search(r'<i class="zero" style="left: ([\d.]+)%"', tornado)
+        grid = tornado.split('<div class="t-lines">', 1)[1].split("</div>", 1)[0]
+        lines = [
+            (float(left) / 100, set(cls.split()) - {"zero"})
+            for cls, left in re.findall(
+                r'<i(?: class="([^"]*)")? style="left: ([\d.]+)%"></i>', grid
+            )
+            if "base" not in cls.split()
+        ]
+        # Each label has a gridline, hidden in the same ranges as the label.
+        self.assertEqual(lines, [(at, hidden) for at, _, hidden in labels])
+        for window in report.AXIS_TIERS:
+            shown = [label for label in labels if "h%d" % window not in label[2]]
+            with self.subTest(window=window):
+                self.assertTrue(shown, "every range keeps at least one label")
+                self.assert_clear(shown, report.tornado_axis_width(window, tip))
+        # When the axis has zero, every range labels it.
+        zero = re.search(r'<i class="zero" style="left: ([\d.]+)%"', grid)
         if zero:
             at = float(zero.group(1)) / 100
-            self.assertIn((at, True), [(place, shown) for place, _, shown in labels])
+            self.assertIn((at, set()), [(place, hidden) for place, _, hidden in labels])
         return labels
+
+    def test_the_example_labels_every_tick_from_375px(self):
+        """Every phone width used to keep the 320px labels: two of the four,
+        even at 760px, where the axis is 558px against 290px at 761px."""
+        labels = self.check(load_spec(EXAMPLE).to_html())
+        everything = ["-$100k", "$0", "$100k", "$200k"]
+        self.assertEqual([text for _, text, _ in labels], everything)
+        for window in report.AXIS_TIERS:
+            expected = ["$0", "$200k"] if window == 320 else everything
+            self.assertEqual(shown_at(labels, window), expected, window)
+
+    def test_the_example_in_chf_keeps_two_labels_on_a_phone(self):
+        """In CHF the example's phone axis read "CHF 0" alone at every width up
+        to 760px, and 1280px labelled two of four ticks on a 382px axis."""
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        raw["currency"] = "CHF"
+        labels = self.check(render(raw))
+        everything = ["-CHF 100k", "CHF 0", "CHF 100k", "CHF 200k"]
+        expected = {
+            1001: everything,
+            761: ["CHF 0", "CHF 200k"],
+            600: everything,
+            480: ["CHF 0", "CHF 200k"],
+            375: ["CHF 0", "CHF 200k"],
+            320: ["CHF 0"],
+        }
+        for window, texts in expected.items():
+            self.assertEqual(shown_at(labels, window), texts, window)
 
     def test_a_six_tick_axis_thins_on_a_phone(self):
         labels = self.check(render(wide_northwind()))
-        self.assertEqual(
-            [text for _, text, _ in labels],
-            ["-$100k", "$0", "$100k", "$200k", "$300k", "$400k"],
-        )
-        self.assertEqual([text for _, text, shown in labels if shown], ["$0", "$300k"])
-
-    def test_the_example_keeps_every_label_wide_and_half_on_a_phone(self):
-        labels = self.check(load_spec(EXAMPLE).to_html())
-        self.assertEqual(
-            [(text, shown) for _, text, shown in labels],
-            [("-$100k", False), ("$0", True), ("$100k", False), ("$200k", True)],
-        )
+        everything = ["-$100k", "$0", "$100k", "$200k", "$300k", "$400k"]
+        self.assertEqual([text for _, text, _ in labels], everything)
+        self.assertEqual(shown_at(labels, 480), everything)
+        self.assertEqual(shown_at(labels, 375), ["$0", "$200k", "$400k"])
+        self.assertEqual(shown_at(labels, 320), ["$0", "$300k"])
 
     def test_long_labels_thin_the_wide_axis_too(self):
         labels = self.check(render(wide_northwind(currency="CHF")))
-        self.assertEqual(
-            [text for _, text, _ in labels], ["CHF 0", "CHF 200k", "CHF 400k"]
-        )
+        self.assertEqual(shown_at(labels, 761), ["CHF 0", "CHF 200k", "CHF 400k"])
+        self.assertEqual(len(shown_at(labels, 1001)), 6)
 
     def test_every_edge_case_keeps_its_labels_apart(self):
         for name, raw in edge_cases().items():
@@ -640,18 +675,97 @@ class TestAxisLabels(unittest.TestCase):
                 with self.subTest(case=name):
                     self.check(html)
 
-    def test_phone_rules_hide_the_thinned_ticks(self):
-        phone = report.CSS.split("@media screen and (max-width: 760px) {", 1)[1]
-        phone = phone.split("\n}\n", 1)[0]
-        self.assertIn(".t-axis span.wide, .t-lines i.wide { display: none; }", phone)
+    def test_a_range_with_room_for_more_labels_keeps_them(self):
+        """At each range's narrowest window, the axis shows as many labels as
+        any every-k-th-tick-from-zero spacing could fit there, judged on the
+        same width estimate, and a wider axis never shows fewer."""
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            northwind = json.load(handle)
+        cases = dict(edge_cases())
+        for code in ("USD", "CHF", "AUD", "SEK"):
+            for name, raw in (("example", northwind), ("wide", wide_northwind())):
+                cases["%s %s" % (name, code)] = dict(deepcopy(raw), currency=code)
+        for name, raw in cases.items():
+            html = render(raw)
+            if 'class="t-axis"' not in html:
+                continue
+            tip = int(re.search(r'style="--tip: (\d+)px"', html).group(1))
+            labels = axis_labels(html)
+            places = [at for at, _, _ in labels]
+            # The full tick list: unlabelled ticks are left out of the HTML,
+            # so rebuild it from the case's own scale.
+            case = validate_spec(raw)
+            rows, base = case.sensitivity(), case.summary()["npv"]
+            values = [base] + [r[k] for r in rows for k in ("npv_low", "npv_high")]
+            scale = report.nice_scale(
+                values, min_span=10 * report._rounding_step(rows, base)
+            )
+            texts = [
+                report.tick_label(t, scale.exponent, case.currency) for t in scale.ticks
+            ]
+            widths = [report._text_width(t, report.AXIS_FONT) for t in texts]
+            start = scale.ticks.index(0.0) if 0.0 in scale.ticks else 0
+            self.assertEqual(len(places), len(set(places)))
+            counts = []
+            for window in report.AXIS_TIERS:
+                width = report.tornado_axis_width(window, tip)
+                step = width * scale.step / (scale.hi - scale.lo)
+                most = 1
+                for k in range(1, len(texts)):
+                    picked = [i for i in range(len(texts)) if (i - start) % k == 0]
+                    if all(
+                        k * step - (widths[a] + widths[b]) / 2 >= report.AXIS_GAP
+                        for a, b in zip(picked, picked[1:])
+                    ):
+                        most = max(most, len(picked))
+                with self.subTest(case=name, window=window):
+                    self.assertEqual(len(shown_at(labels, window)), most)
+                counts.append((width, most))
+            for (wide, many), (narrow, few) in zip(
+                sorted(counts, reverse=True), sorted(counts, reverse=True)[1:]
+            ):
+                self.assertGreaterEqual(many, few, (name, wide, narrow))
+
+    def test_each_range_hides_its_own_ticks(self):
+        """The CSS shows a range the ticks the wider range above it hid and
+        hides its own, in max-width queries from the widest range down, so the
+        narrowest one that matches a window wins; paper gets the 761px set."""
+        css = report.CSS
+        tiers = list(report.AXIS_TIERS)
+        self.assertEqual(tiers, sorted(tiers, reverse=True))
+        self.assertIn(
+            "\n.t-axis .h%d, .t-lines .h%d { display: none; }" % (tiers[0], tiers[0]),
+            css,
+        )
+        last = -1
+        for above, window in zip(tiers, tiers[1:]):
+            query = "@media screen and (max-width: %dpx)" % (above - 1)
+            if window == report.WIDE_MIN_WINDOW:
+                query += ", print"
+            block = (
+                "%s {\n"
+                "  .t-axis .h%d, .t-lines .h%d { display: block; }\n"
+                "  .t-axis .h%d, .t-lines .h%d { display: none; }\n}"
+                % (query, above, above, window, window)
+            )
+            with self.subTest(window=window):
+                self.assertIn(block, css)
+                self.assertGreater(css.index(block), last)
+                last = css.index(block)
+        # The range below the wide layout starts at its breakpoint.
+        self.assertIn(
+            "@media screen and (max-width: %dpx) {\n  .report {"
+            % (report.WIDE_MIN_WINDOW - 1),
+            css,
+        )
 
     def test_axis_geometry_matches_the_stylesheet(self):
         css = report.CSS
-        phone = css.split("@media screen and (max-width: 760px) {", 1)[1]
+        phone = css.split("@media screen and (max-width: 760px) {\n  .report", 1)[1]
         self.assertEqual(report.WIDE_MIN_WINDOW, 761)
         self.assertIn(
-            ".report { max-width: 980px; margin: 0 auto; padding: 40px %dpx 56px; }"
-            % report._PAGE_PAD["wide"],
+            ".report { max-width: %dpx; margin: 0 auto; padding: 40px %dpx 56px; }"
+            % (report.REPORT_MAX_WIDTH, report._PAGE_PAD["wide"]),
             css,
         )
         self.assertIn(
@@ -666,7 +780,7 @@ class TestAxisLabels(unittest.TestCase):
             css,
         )
         self.assertIn(
-            ".report { padding: 24px %dpx 40px; }" % report._PAGE_PAD["phone"], phone
+            " { padding: 24px %dpx 40px; }" % report._PAGE_PAD["phone"], phone
         )
         self.assertIn(
             "section { padding: 18px %dpx; }" % report._SECTION_PAD["phone"], phone
@@ -675,6 +789,10 @@ class TestAxisLabels(unittest.TestCase):
             ".tornado { --label: %d%%; --gut: max(%dpx, var(--tip)); }"
             % (100 * report._NAME_COLUMN["phone"], report._MIN_GUTTER["phone"]),
             phone,
+        )
+        # The axis stops growing with the report at its widest.
+        self.assertEqual(
+            report.tornado_axis_width(1001, 70), report.tornado_axis_width(1440, 70)
         )
 
 
