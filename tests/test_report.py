@@ -876,6 +876,21 @@ class TestSharedWording(unittest.TestCase):
         self.assertNotIn("by hand", markdown)
         self.assertIn("| 124,800 tickets ", markdown)
 
+    def test_footer_says_the_spec_numbers_are_rounded(self):
+        """Both renderings show 1234.5 as 1,234 and a 12.5% rate as 12%, so
+        neither may say the spec is reproduced as written."""
+        raw = spec(discount_rate_annual=0.125)
+        raw["drivers"][0]["inputs"]["volume"]["value"] = 1234.5
+        case = validate_spec(raw)
+        html, markdown = case.to_html(), case.to_markdown()
+        self.assertIn('data-label="Value">1,234</td>', html)
+        self.assertIn("| 1,234 ", markdown)
+        for text in (html, markdown):
+            with self.subTest(text=text[:20]):
+                self.assertIn("discounted at 12% annually", text)
+                self.assertIn("with numbers rounded for display", text)
+                self.assertNotIn("as written", text)
+
 
 class TestScale(unittest.TestCase):
     def test_reproduces_the_design_axes(self):

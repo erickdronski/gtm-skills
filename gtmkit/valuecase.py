@@ -108,11 +108,12 @@ FLOOR_FAILS = (
 )
 # What either footer may truthfully say: the ledger, sources, notes and meta
 # are the spec's own words and numbers, so only the computed figures are the
-# library's.
+# library's. The spec's numbers are shown at display precision (1234.5 as
+# 1,234, a 12.5% rate as 12%), so they are not "as written" either.
 PROVENANCE = (
     "Every computed figure above comes from the declared inputs through a "
-    "tested library; the inputs, sources and other text are reproduced from "
-    "the spec as written."
+    "tested library; the inputs, sources and other text come from the spec, "
+    "with numbers rounded for display."
 )
 # The markdown brief lists this many attribution and sensitivity rows and says
 # how many it left out; the HTML report and the JSON model carry every row.

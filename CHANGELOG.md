@@ -49,7 +49,8 @@ renders as an HTML report to share.
 - The markdown brief's footer no longer says that no number in it was written
   by hand: its ledger prints the spec's own inputs. It now makes the same
   claim as the HTML report's footer, that the computed figures come from the
-  library and the inputs, sources and other text from the spec.
+  library and the inputs, sources and other text from the spec, with numbers
+  rounded for display.
 
 ### Skills
 
