@@ -58,7 +58,7 @@ renders as an HTML report to share.
   `python3 -m gtmkit.<module>` ones.
 - The README's quoted brief is checked line by line against the example's
   output, and its report screenshot for size.
-- 437 tests, up from 346. CI also builds the wheel, installs it, and runs the
+- 463 tests, up from 346. CI also builds the wheel, installs it, and runs the
   installed `gtmkit` command, every starter with the command it names, and the
   HTML report outside the repository.
 
