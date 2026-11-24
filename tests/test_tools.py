@@ -4,7 +4,7 @@ import os
 import unittest
 
 from gtmkit import fmt
-from gtmkit.funnel import FunnelError, parse_stage, plan
+from gtmkit.funnel import FunnelError, Stage, parse_stage, plan, to_markdown
 from gtmkit.pricing import PricingError, analyze, parse_responses
 from gtmkit.scoring import Rubric, RubricError, score_all, score_record
 from gtmkit.sizing import SizingError, size
@@ -60,6 +60,58 @@ class TestFunnel(unittest.TestCase):
         result = plan(1_000_000, 50_000, self.stages(), audience_ceiling=10_000)
         self.assertTrue(result["feasible"])
         self.assertIsNone(result["ceiling_note"])
+
+    def test_missing_ceiling_is_unknown_and_zero_ceiling_is_unreachable(self):
+        unknown = plan(10000, 1000, [parse_stage("lead:0.5")])
+        empty = plan(10000, 1000, [parse_stage("lead:0.5")], audience_ceiling=0)
+        self.assertIsNone(unknown["feasible"])
+        self.assertIn("unverified", to_markdown(unknown))
+        self.assertIs(empty["feasible"], False)
+        self.assertEqual(empty["top_of_funnel_volume"], 20)
+        self.assertIn("audience is zero", to_markdown(empty))
+
+    def test_exact_ceiling_fits_in_library_report(self):
+        result = plan(10000, 1000, [parse_stage("lead:0.5")], audience_ceiling=20)
+        self.assertIs(result["feasible"], True)
+        self.assertEqual(result["audience_ceiling"], 20)
+        self.assertIn("fits within", to_markdown(result))
+
+    def test_zero_cost_has_a_named_stage_and_zero_spend(self):
+        result = plan(10000, 1000, [parse_stage("lead:0.5")], cost_per_unit=0)
+        self.assertEqual(result["cost_stage"], "lead")
+        self.assertEqual(result["cost_stage_volume"], 20)
+        self.assertEqual(result["spend"], 0)
+        self.assertEqual(result["cac"], 0)
+
+    def test_invalid_cost_and_audience_are_rejected(self):
+        for field in ("cost_per_unit", "audience_ceiling"):
+            for invalid in (-2, float("nan"), float("inf"), float("-inf")):
+                case = self.subTest(field=field, invalid=invalid)
+                with case, self.assertRaisesRegex(FunnelError, field):
+                    plan(10000, 1000, self.stages(), **{field: invalid})
+
+    def test_nonfinite_revenue_and_acv_are_rejected(self):
+        for invalid in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(FunnelError, "acv"):
+                    plan(10000, invalid, self.stages())
+                with self.assertRaisesRegex(FunnelError, "target_revenue"):
+                    plan(invalid, 1000, self.stages())
+
+    def test_library_stage_rates_follow_the_same_rules_as_cli_rates(self):
+        for rate in (0, -1, 1.1, float("inf"), float("nan")):
+            with self.subTest(rate=rate), self.assertRaisesRegex(FunnelError, "lead"):
+                plan(10000, 1000, [Stage("lead", rate)])
+
+    def test_unrepresentable_volume_and_cost_raise_funnel_error(self):
+        for revenue, acv, rate, cost in (
+            (1e-300, 1e300, 1, None),
+            (1e300, 1, 1e-300, None),
+            (1e300, 1, 1, 1e300),
+        ):
+            case = self.subTest(revenue=revenue, acv=acv, rate=rate, cost=cost)
+            with case, self.assertRaisesRegex(FunnelError, "numeric range"):
+                plan(revenue, acv, [Stage("lead", rate)], cost_per_unit=cost)
 
     def test_rejects_percentage_style_rate(self):
         with self.assertRaises(FunnelError) as ctx:
