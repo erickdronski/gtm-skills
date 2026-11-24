@@ -15,6 +15,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 
@@ -167,6 +168,64 @@ class TestInstalledLayout(unittest.TestCase):
                         result.returncode, 0, result.stderr.decode("utf-8")
                     )
                     self.assertTrue(result.stdout.strip())
+
+
+class TestSourceDistribution(unittest.TestCase):
+    """The sdist is the engine, as the wheel is, not half of the test suite.
+
+    setuptools puts tests/test*.py in an sdist by default, without
+    tests/__init__.py, tools/, examples/ or skills/, so the suite it shipped
+    could not import or find its fixtures (58 errors, 11 failures).
+    """
+
+    def test_the_manifest_keeps_the_tests_out(self):
+        commands = [
+            line.split()
+            for line in read("MANIFEST.in").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        self.assertIn(["prune", "tests"], commands)
+
+    def test_a_built_sdist_carries_the_engine_and_no_tests(self):
+        try:
+            import setuptools
+        except ImportError:
+            self.skipTest("setuptools is not installed")
+        if int(setuptools.__version__.split(".")[0]) < 77:
+            self.skipTest("pyproject.toml needs setuptools 77 or later")
+        with tempfile.TemporaryDirectory() as tmp:
+            source = os.path.join(tmp, "source")
+            shutil.copytree(
+                REPO_ROOT,
+                source,
+                ignore=shutil.ignore_patterns(
+                    ".git", "build", "dist", "*.egg-info", "__pycache__", ".*cache"
+                ),
+            )
+            built = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; from setuptools import build_meta; "
+                    "print(build_meta.build_sdist(sys.argv[1]))",
+                    os.path.join(tmp, "dist"),
+                ],
+                cwd=source,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr.decode("utf-8"))
+            name = built.stdout.decode("utf-8").strip().splitlines()[-1]
+            with tarfile.open(os.path.join(tmp, "dist", name)) as archive:
+                files = [
+                    member.split("/", 1)[1]
+                    for member in archive.getnames()
+                    if "/" in member
+                ]
+        self.assertEqual([f for f in files if f.startswith("tests")], [])
+        for path in wheel_files():
+            self.assertIn("gtmkit/%s" % path, files)
 
 
 class TestProjectMetadata(unittest.TestCase):

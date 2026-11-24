@@ -47,9 +47,10 @@ Issues = "https://github.com/erickdronski/gtm-skills/issues"
 gtmkit = "gtmkit.cli:main"
 
 [tool.setuptools]
-# The engine only. skills/, examples/ and tests/ stay in the repository; the
-# starter specs `gtmkit init` prints ship as copies under gtmkit/templates/,
-# and the MEDDPICC rubric `gtmkit qualify` reads as a copy under gtmkit/data/.
+# The engine only. skills/, examples/ and tests/ stay in the repository (and,
+# by MANIFEST.in, out of the sdist too); the starter specs `gtmkit init`
+# prints ship as copies under gtmkit/templates/, and the MEDDPICC rubric
+# `gtmkit qualify` reads as a copy under gtmkit/data/.
 packages = ["gtmkit"]
 # Data files are listed explicitly below rather than swept in from a manifest.
 include-package-data = false

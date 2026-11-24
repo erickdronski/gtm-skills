@@ -76,6 +76,9 @@ renders as an HTML report to share.
   `python3 -m gtmkit.<module>` ones.
 - The README's quoted brief is checked line by line against the example's
   output, and its report screenshot for size.
+- A source distribution built from the repository carries the engine only, as
+  the wheel does: `MANIFEST.in` keeps out the tests, which cannot run without
+  the rest of the repository.
 - 463 tests, up from 346. CI also builds the wheel, installs it, and runs the
   installed `gtmkit` command, every starter with the command it names, and the
   HTML report outside the repository.

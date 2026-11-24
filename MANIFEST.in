@@ -1,0 +1,6 @@
+# The sdist carries the engine, as the wheel does. setuptools adds
+# tests/test*.py to an sdist by default, but outside the repository the suite
+# cannot run: it imports tools/ and reads examples/ and skills/, none of which
+# ship. pyproject.toml lists the package data itself; this file only keeps the
+# tests out.
+prune tests
