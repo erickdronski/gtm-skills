@@ -539,7 +539,7 @@ class TestEscaping(unittest.TestCase):
         driver = raw["drivers"][0]
         driver["label"] = "Label " + payload
         driver["inputs"]["volume"]["source"] = payload + " Warehouse export 2026-01-01"
-        driver["inputs"]["volume"]["unit"] = '"unit"<i>'
+        driver["inputs"]["volume"]["unit"] = '"unit" & <i>'
         raw["costs"][0]["label"] = "Cost " + payload
         raw["costs"][0]["note"] = "Note " + payload
         html = render(raw)
@@ -554,6 +554,13 @@ class TestEscaping(unittest.TestCase):
         self.assertIn("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;", html)
         self.assertIn("&#x27;q&#x27;", html)
         self.assertIn("&lt;B ONMOUSEOVER=1&gt;", html)
+        # Ampersands and quotes from the name, labels, sources, meta keys and
+        # values, cost lines, and units arrive as entities, never raw.
+        self.assertNotIn("& 'q'", html)
+        self.assertIn("&amp; &#x27;q&#x27;", html)
+        self.assertIn("&quot;unit&quot; &amp; &lt;i&gt;", html)
+        self.assertIn("<title>Case &lt;script&gt;", html)
+        self.assertIn("<dt>&lt;script&gt;alert(&quot;x&quot;)", html)
 
     def test_spec_links_are_text_not_links(self):
         html = render(edge_cases()["long labels and sources"])
