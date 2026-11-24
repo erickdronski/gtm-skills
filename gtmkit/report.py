@@ -390,9 +390,23 @@ def _meta_items(meta: Mapping[str, Any]) -> List[Tuple[str, str]]:
             text = json.dumps(value, ensure_ascii=False, sort_keys=True)
         else:
             text = str(value)
-        label = known.get(key) or str(key).replace("_", " ").strip().capitalize()
+        label = known.get(key) or _meta_label(key)
         items.append((label or "Note", text))
     return items
+
+
+def _meta_label(key: Any) -> str:
+    """A free-form meta key as a label, in the case it was written in.
+
+    Underscores read as spaces, and a first word written all in lower case
+    gets a capital: "decision_owner" is "Decision owner", while "ARR_at_risk"
+    and "iPhone_rollout" keep their acronym and brand ("ARR at risk", not
+    "Arr at risk").
+    """
+    first, space, rest = str(key).replace("_", " ").strip().partition(" ")
+    if first.islower():
+        first = first[:1].upper() + first[1:]
+    return first + space + rest
 
 
 def _headline(case: Any) -> str:

@@ -347,6 +347,30 @@ class TestDocument(unittest.TestCase):
         ):
             self.assertIn("<dt>%s</dt><dd>%s</dd>" % (label, value), self.html)
 
+    def test_meta_keys_keep_the_case_they_were_written_in(self):
+        """str.capitalize() turned ARR into "Arr" and CRM into "Crm"."""
+        meta = {
+            "ARR_at_risk": "$4.2M",
+            "CRM": "Salesforce",
+            "QBR_date": "2026-10-15",
+            "iPhone_rollout": "Q1",
+            "account_ID": "NW-1042",
+            "decision_owner": "CFO",
+        }
+        html = render(spec(meta=meta))
+        labels = re.findall(r"<dt>([^<]*)</dt>", html)
+        self.assertEqual(
+            labels,
+            [
+                "ARR at risk",
+                "CRM",
+                "QBR date",
+                "iPhone rollout",
+                "Account ID",
+                "Decision owner",
+            ],
+        )
+
     def test_every_sensitivity_row_is_charted_and_tabled(self):
         rows = self.case.sensitivity()
         self.assertEqual(len(self.doc.find("div", "t-row")), len(rows))
