@@ -858,7 +858,11 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
             "at least the subscription and the implementation effort."
         )
 
-    meta = spec.get("meta") or {}
+    # Only a missing or null meta means "none": [], 0, false and "" are not
+    # objects either, and are refused like any other non-object.
+    meta = spec.get("meta")
+    if meta is None:
+        meta = {}
     if not isinstance(meta, Mapping):
         raise SpecError(
             "'meta' must be an object, e.g. "

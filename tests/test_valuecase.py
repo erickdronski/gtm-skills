@@ -426,9 +426,15 @@ class TestCommandLineErrors(unittest.TestCase):
                     self.assertIn("spec error: division by zero", err.getvalue())
 
     def test_meta_must_be_an_object(self):
-        for meta in ("draft", ["draft"], 3):
+        # Falsy non-objects too: `[]`, `0`, `false` and `""` are not objects.
+        for meta in ("draft", ["draft"], 3, [], 0, False, ""):
             with self.subTest(meta=meta), self.assertRaises(SpecError):
                 validate_spec(minimal_spec(meta=meta))
+
+    def test_missing_or_null_meta_means_none(self):
+        self.assertEqual(validate_spec(minimal_spec()).meta, {})
+        self.assertEqual(validate_spec(minimal_spec(meta=None)).meta, {})
+        self.assertEqual(validate_spec(minimal_spec(meta={})).meta, {})
 
     def test_unreadable_spec_is_a_spec_error(self):
         with tempfile.TemporaryDirectory() as tmp:
