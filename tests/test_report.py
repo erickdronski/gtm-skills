@@ -18,14 +18,26 @@ from copy import deepcopy
 from html import unescape
 from html.parser import HTMLParser
 
-from gtmkit import cli, report, valuecase
+from gtmkit import cli, finance, report, valuecase
 from gtmkit.valuecase import load_spec, validate_spec
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXAMPLE = os.path.join(
     REPO_ROOT, "examples", "value-case", "northwind-support-deflection.json"
 )
-VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "wbr"}
+VOID = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "wbr",
+}
 ALLOWED_TAGS = {
     "a", "b", "body", "circle", "code", "dd", "div", "dl", "dt", "figcaption",
     "figure", "footer", "h1", "h2", "h3", "head", "header", "html", "i", "li",
@@ -161,11 +173,17 @@ def edge_cases():
     # Period 0 carries no cost and every later year nets positive: no sign
     # change, so IRR is undefined and nothing is ever at risk.
     cases["all-positive cash flows"] = spec(
-        costs=[{"id": "sub", "label": "Subscription", "schedule": [0, 1000, 1000, 1000]}]
+        costs=[
+            {"id": "sub", "label": "Subscription", "schedule": [0, 1000, 1000, 1000]}
+        ]
     )
     cases["payback never"] = spec(
         costs=[
-            {"id": "sub", "label": "Subscription", "schedule": [0, 20000, 20000, 20000]},
+            {
+                "id": "sub",
+                "label": "Subscription",
+                "schedule": [0, 20000, 20000, 20000],
+            },
             {"id": "impl", "label": "Implementation", "schedule": [5000, 0, 0, 0]},
         ]
     )
@@ -212,6 +230,35 @@ def edge_cases():
     negative = spec()
     negative["drivers"][0]["formula"] = "volume * rate * unit_value - 12000"
     cases["driver worth less than nothing"] = negative
+
+    # No modeled benefit at all: nothing to grade, no IRR, no payback.
+    nothing = spec()
+    nothing["drivers"][0]["inputs"]["volume"]["value"] = 0
+    cases["zero benefit"] = nothing
+
+    # A declared range the formula cannot feel.
+    inert = spec()
+    inert["drivers"][0]["formula"] = "volume * unit_value * 0.2 + rate * 0"
+    cases["ranged input with no effect"] = inert
+
+    # Every outcome above zero, so the tornado axis does not include it.
+    rich = spec()
+    rich["drivers"][0]["inputs"]["volume"]["value"] = 5000
+    cases["every outcome positive"] = rich
+
+    # An odd number of years, so the last period name has an even neighbour.
+    cases["nine years"] = spec(
+        horizon_years=9,
+        costs=[{"id": "sub", "label": "Sub", "schedule": [9000] + [3000] * 9}],
+    )
+
+    # A currency code instead of a symbol, on amounts in the millions.
+    chf = spec(currency="CHF")
+    chf["drivers"][0]["inputs"]["volume"]["value"] = 400000
+    chf["costs"] = [
+        {"id": "sub", "label": "Sub", "schedule": [600000, 300000, 300000, 300000]}
+    ]
+    cases["currency code"] = chf
     return cases
 
 
@@ -351,10 +398,140 @@ class TestDocument(unittest.TestCase):
         self.assertEqual(again, self.html)
         self.assertEqual(self.case.to_html(), self.html)
 
+    def test_every_cell_carries_its_column_name_for_phones(self):
+        tables = re.findall(r"<table [^>]*>(.*?)</table>", self.html, re.S)
+        # Sensitivity, cash flow, value drivers, assumption ledger, costs.
+        self.assertEqual(len(tables), 5)
+        for table in tables:
+            headers = [unescape(h) for h in re.findall(r"<th[^>]*>([^<]*)</th>", table)]
+            for row in re.findall(r"<tr>(.*?)</tr>", table.split("<tbody>", 1)[1]):
+                labels = re.findall(r'<td[^>]* data-label="([^"]*)">', row)
+                self.assertEqual([unescape(x) for x in labels], headers)
+
+    def test_cash_table_stays_a_grid_on_a_phone(self):
+        self.assertIn(
+            '<table class="compact" aria-label="Cash flow by period">', self.html
+        )
+        self.assertEqual(self.html.count('<table class="stack"'), 4)
+
+
+class TestGeometry(unittest.TestCase):
+    """Bars point the way their numbers do, at the size the axis says."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.case = load_spec(EXAMPLE)
+        cls.html = cls.case.to_html()
+
+    def test_tornado_bars_run_from_the_base_to_each_outcome(self):
+        rows = self.case.sensitivity()
+        base = self.case.summary()["npv"]
+        scale = report.nice_scale(
+            [base] + [r[k] for r in rows for k in ("npv_low", "npv_high")]
+        )
+
+        def at(value):
+            return 100 * scale.fraction(value)
+
+        base_line = re.search(r'<i class="base" style="left: ([\d.]+)%"', self.html)
+        self.assertAlmostEqual(float(base_line.group(1)), at(base), places=2)
+        plots = re.findall(r'<div class="t-plot">(.*?)</div>\n</div>', self.html)
+        self.assertEqual(len(plots), len(rows))
+        for row, plot in zip(rows, plots):
+            with self.subTest(input=row["input"]):
+                bars = {
+                    kind: (float(left), float(width))
+                    for kind, left, width in re.findall(
+                        r'class="bar (below|above)" style="left: ([\d.]+)%; '
+                        r'width: ([\d.]+)%"',
+                        plot,
+                    )
+                }
+                low = min(row["npv_low"], row["npv_high"])
+                high = max(row["npv_low"], row["npv_high"])
+                self.assertEqual("below" in bars, low < base)
+                self.assertEqual("above" in bars, high > base)
+                if "below" in bars:
+                    left, width = bars["below"]
+                    self.assertAlmostEqual(left, at(low), delta=0.01)
+                    self.assertAlmostEqual(left + width, at(base), delta=0.02)
+                if "above" in bars:
+                    left, width = bars["above"]
+                    self.assertAlmostEqual(left, at(base), delta=0.01)
+                    self.assertAlmostEqual(left + width, at(high), delta=0.02)
+
+    def test_tornado_gutters_hold_the_widest_value_label(self):
+        tips = re.findall(r'<span class="tip (?:lo|hi)"[^>]*>([^<]*)</span>', self.html)
+        gutter = int(re.search(r'style="--tip: (\d+)px"', self.html).group(1))
+        self.assertTrue(tips)
+        for tip in tips:
+            self.assertGreaterEqual(gutter, report._text_width(unescape(tip), 12.5))
+
+    def test_label_width_estimate_errs_wide(self):
+        """Widths Chrome drew for semibold system-ui on macOS, the face the
+        report asks for first. Room is reserved from the estimate, so it must
+        never come in under what is drawn."""
+        measured = [
+            ("$238.7k", 12.5, 50.4),
+            ("-$72.8k", 12.5, 48.5),
+            ("-$200k", 12.0, 44.2),
+            ("$0", 12.0, 15.9),
+            ("-$0.50", 12.0, 40.5),
+            ("-CHF 600k", 12.5, 67.4),
+            ("CA$999.9k", 13.0, 71.8),
+            ("WWW 100k", 12.5, 70.5),
+            ("-$1000000B", 13.0, 81.3),
+            ("CHF 4M", 13.0, 50.6),
+        ]
+        for text, size, width in measured:
+            with self.subTest(text=text, size=size):
+                self.assertGreaterEqual(report._text_width(text, size), width)
+
+    def test_cash_bars_point_the_way_their_sign_says_and_share_one_scale(self):
+        wide = self.html.split('<svg class="wide"', 1)[1].split("</svg>", 1)[0]
+        grid = [
+            float(y)
+            for y in re.findall(r'<line class="[gz]"[^>]* y1="([-\d.]+)"', wide)
+        ]
+        zero = float(re.search(r'<line class="z"[^>]* y1="([-\d.]+)"', wide).group(1))
+        net = self.case.net_flows()
+        running = finance.cumulative(net)
+        ticks = report.nice_scale(net + running, include_zero=True).ticks
+        # Pixels per currency unit, read off the drawn grid lines.
+        ppu = (grid[0] - grid[-1]) / (ticks[-1] - ticks[0])
+        self.assertGreater(ppu, 0)
+        bars = re.findall(
+            r'<path class="(pos|neg)" d="M[-\d.]+ ([-\d.]+)'
+            r"(?:v([-\d.]+)a([\d.]+)|h[\d.]+v([\d.]+)a([\d.]+))",
+            wide,
+        )
+        drawn = [v for v in net if v != 0]
+        self.assertEqual(len(bars), len(drawn))
+        for (kind, start, up, up_r, down, down_r), value in zip(bars, drawn):
+            with self.subTest(value=value):
+                self.assertEqual(kind, "pos" if value > 0 else "neg")
+                self.assertAlmostEqual(float(start), zero, delta=0.1)
+                # Up: v -(h - r), then a rounded corner of radius r.
+                height = (
+                    -float(up) + float(up_r)
+                    if value > 0
+                    else float(down) + float(down_r)
+                )
+                self.assertAlmostEqual(height, abs(value) * ppu, delta=0.2)
+        dots = [
+            float(y)
+            for y in re.findall(
+                r'<circle class="dot" cx="[-\d.]+" cy="([-\d.]+)"', wide
+            )
+        ]
+        self.assertEqual(len(dots), len(running))
+        for cy, value in zip(dots, running):
+            self.assertAlmostEqual(cy, zero - value * ppu, delta=0.2)
+
 
 class TestEscaping(unittest.TestCase):
     def test_spec_strings_cannot_inject_markup(self):
-        payload = '<script>alert("x")</script><img src=x onerror=alert(1)> & \'q\''
+        payload = "<script>alert(\"x\")</script><img src=x onerror=alert(1)> & 'q'"
         raw = spec(name="Case " + payload, currency="<b onmouseover=1>")
         raw["meta"] = {"prepared_for": payload, payload: payload}
         driver = raw["drivers"][0]
@@ -379,7 +556,9 @@ class TestEscaping(unittest.TestCase):
     def test_spec_links_are_text_not_links(self):
         html = render(edge_cases()["long labels and sources"])
         doc = Document(html)
-        self.assertEqual([a["href"] for _, a in doc.elements if "href" in a], [report.REPO_URL])
+        self.assertEqual(
+            [a["href"] for _, a in doc.elements if "href" in a], [report.REPO_URL]
+        )
         for found in re.findall(r"https?://[^\s\"<>]+", html):
             self.assertTrue(
                 found == report.REPO_URL or "dashboards.example.com" in found, found
@@ -431,7 +610,11 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_unicode_survives(self):
         html = render(edge_cases()["unicode"])
-        for text in ("Düsseldorf rollout — 東京 pilot 🚀", "Ärger vermeiden · 节省时间", "€"):
+        for text in (
+            "Düsseldorf rollout — 東京 pilot 🚀",
+            "Ärger vermeiden · 节省时间",
+            "€",
+        ):
             self.assertIn(text, html)
         self.assertIn('<meta charset="utf-8">', html)
 
@@ -442,6 +625,49 @@ class TestEdgeCases(unittest.TestCase):
     def test_long_values_shrink_the_hero_figure(self):
         html = render(edge_cases()["very large values"])
         self.assertRegex(html, r'class="value num( l2| l3)?">-?\$[\d.,]+[kMB]?<')
+
+    def test_zero_benefit_has_nothing_to_grade(self):
+        raw = edge_cases()["zero benefit"]
+        case = validate_spec(raw)
+        self.assertIsNone(case.summary()["irr_annual"])
+        html = case.to_html()
+        self.assertIn('aria-label="Evidence grade n/a"', html)
+        self.assertNotIn('class="seg"', html)
+        self.assertEqual(
+            html_headline(html)["Margin of safety"],
+            "n/a — no modeled benefit to shrink",
+        )
+
+    def test_a_range_that_moves_nothing_says_so_without_widening_the_chart(self):
+        html = render(edge_cases()["ranged input with no effect"])
+        self.assertIn('quiet" style="left: ', html)
+        self.assertIn(">no change</span>", html)
+        # No value label to make room for, so the gutters fall to their minimum.
+        self.assertIn('style="--tip: 14px"', html)
+
+    def test_an_axis_without_zero_says_so(self):
+        html = render(edge_cases()["every outcome positive"])
+        self.assertIn("The axis does not start at zero", html)
+        self.assertNotIn('<i class="zero"', html)
+        northwind = load_spec(EXAMPLE).to_html()
+        self.assertNotIn("does not start at zero", northwind)
+        self.assertIn('<i class="zero"', northwind)
+
+    def test_the_last_period_is_always_named(self):
+        html = render(edge_cases()["nine years"])
+        for variant in ("wide", "narrow"):
+            svg = html.split('<svg class="%s"' % variant, 1)[1].split("</svg>", 1)[0]
+            names = re.findall(r'text-anchor="middle">([^<]+)<', svg)
+            with self.subTest(variant=variant):
+                self.assertIn(names[-1], ("Year 9", "Y9"))
+                self.assertEqual(len(names), len(set(names)))
+
+    def test_long_currency_codes_turn_the_cash_table_into_cards(self):
+        html = render(edge_cases()["currency code"])
+        self.assertIn(
+            '<table class="compact cards" aria-label="Cash flow by period">', html
+        )
+        self.assertIn("CHF ", html)
 
 
 class TestSharedWording(unittest.TestCase):
@@ -489,9 +715,7 @@ class TestScale(unittest.TestCase):
                     for tick in scale.ticks:
                         multiple = tick / scale.step
                         self.assertAlmostEqual(multiple, round(multiple), places=6)
-                    labels = [
-                        report.tick_label(t, scale.exponent) for t in scale.ticks
-                    ]
+                    labels = [report.tick_label(t, scale.exponent) for t in scale.ticks]
                     self.assertEqual(len(labels), len(set(labels)), labels)
 
     def test_ignores_non_numbers_and_handles_flat_series(self):
@@ -521,7 +745,9 @@ class TestCommandLine(unittest.TestCase):
                     valuecase.main([EXAMPLE, "--format", "html", "--out", direct]), 0
                 )
                 self.assertEqual(
-                    cli.main(["valuecase", EXAMPLE, "--format", "html", "--out", front]),
+                    cli.main(
+                        ["valuecase", EXAMPLE, "--format", "html", "--out", front]
+                    ),
                     0,
                 )
             with open(direct, encoding="utf-8") as handle:

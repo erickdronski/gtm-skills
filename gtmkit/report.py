@@ -35,6 +35,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from . import __version__, finance
 from .fmt import currency_symbol, fmt_currency, fmt_multiple, fmt_pct, fmt_periods
+from .valuecase import FLOOR_FAILS, FLOOR_HOLDS, FLOOR_NOTE, NO_RANGE_NOTE
 
 __all__ = ["Scale", "nice_scale", "render_value_case", "tick_label"]
 
@@ -55,25 +56,13 @@ META_LABELS = (
     ("status", "Status"),
 )
 
-NO_RANGE_NOTE = (
-    "No input declared a range, so no sensitivity could be run. Add low/high "
-    "bounds to the assumptions — a case without a stated range invites the "
-    "reader to invent their own."
-)
-FLOOR_NOTE = (
-    "Every ranged input simultaneously at its unfavorable bound. This is a "
-    "stress test, not a forecast or a guaranteed minimum. Bounds are selected "
-    "one at a time against the base; interactions and non-monotonic formulas "
-    "may produce worse outcomes within the ranges."
-)
-FLOOR_HOLDS = (
-    "The case still clears zero even at the floor.",
-    " That is the strongest sentence available here — lead with it.",
-)
-FLOOR_FAILS = (
-    "The case goes negative at the floor. Say so, and name which input has to "
-    "hold for it not to."
-)
+# A segment of the evidence bar narrower than this keeps its percentage in the
+# legend only: at 375px a label needs about 11% of the bar to fit.
+THIN_SEGMENT = 0.12
+# A 375px phone leaves 313px inside a section; the compact cash table pads its
+# five cells by 24px in all (see the max-width: 560px rules in CSS).
+PHONE_CONTENT_WIDTH = 313.0
+PHONE_CELL_PADDING = 24.0
 
 
 # -- scales and labels ----------------------------------------------------
@@ -149,9 +138,7 @@ def nice_scale(
                 continue
             ticks = [
                 _times_power_of_ten(k * step_units, exponent - 1)
-                for k in range(
-                    -((-first) // step_units), last // step_units + 1
-                )
+                for k in range(-((-first) // step_units), last // step_units + 1)
             ]
             return Scale(
                 _times_power_of_ten(first, exponent - 1),
@@ -180,19 +167,36 @@ def tick_label(value: float, exponent: int, currency: str = "USD") -> str:
             unit, suffix = power, letter
             break
     decimals = max(0, unit - exponent)
-    text = "{:,.{d}f}".format(magnitude / 10**unit, d=decimals)
+    # No thousands separator, matching fmt_currency's "$4400B".
+    text = "{:.{d}f}".format(magnitude / 10**unit, d=decimals)
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return "%s%s%s%s" % ("-" if value < 0 else "", symbol, text, suffix)
 
 
+_NARROW = frozenset(" .,:;'!|il()[]-")
+_WIDE = frozenset("MWmw%@—")
+
+
 def _text_width(text: str, size: float) -> float:
     """Rough rendered width of ``text`` in a sans-serif face at ``size`` px.
 
-    Only used to reserve room for labels, so it errs wide.
+    Only used to reserve room for labels, so it errs wide: the em widths sit
+    at or above semibold system-ui as Chrome draws it ("-$200k" is 44.2px at
+    12px; this says 45.4). Capitals are wide, and a currency code such as
+    "CHF " is mostly capitals.
     """
-    narrow = sum(1 for ch in text if ch in " .,:;'!|ilI1")
-    return (len(text) - narrow) * 0.62 * size + narrow * 0.34 * size
+    ems = 0.0
+    for ch in text:
+        if ch in _NARROW:
+            ems += 0.38
+        elif ch in _WIDE:
+            ems += 0.95
+        elif ch.isupper():
+            ems += 0.8
+        else:
+            ems += 0.68
+    return ems * size
 
 
 def _pc(fraction: float) -> str:
@@ -254,9 +258,18 @@ def _range_text(low: float, high: float) -> str:
 
 
 def _table(
-    label: str, headers: Sequence[Tuple[str, str]], rows: Sequence[Sequence[str]]
+    label: str,
+    headers: Sequence[Tuple[str, str]],
+    rows: Sequence[Sequence[str]],
+    layout: str = "stack",
 ) -> str:
-    """A table; ``headers`` are (text, css class) and row cells are raw HTML."""
+    """A table; ``headers`` are (text, css class) and row cells are raw HTML.
+
+    On a phone a ``stack`` table shows each row as a card with every value
+    beside its column name (``data-label``), so no column scrolls out of view
+    and no number is cut off at the edge. A ``compact`` table stays a grid at
+    a smaller size, for short numeric columns that fit a phone as they are.
+    """
     head = "".join(
         '<th%s scope="col">%s</th>' % (' class="%s"' % c if c else "", _e(t))
         for t, c in headers
@@ -264,14 +277,19 @@ def _table(
     body = []
     for row in rows:
         cells = "".join(
-            "<td%s>%s</td>"
-            % (' class="%s"' % headers[i][1] if headers[i][1] else "", cell)
+            '<td%s data-label="%s">%s</td>'
+            % (
+                ' class="%s"' % headers[i][1] if headers[i][1] else "",
+                _e(headers[i][0]),
+                cell,
+            )
             for i, cell in enumerate(row)
         )
         body.append("<tr>%s</tr>" % cells)
     return (
-        '<div class="table-wrap"><table aria-label="%s">\n<thead><tr>%s</tr></thead>\n'
-        "<tbody>\n%s\n</tbody>\n</table></div>\n" % (_e(label), head, "\n".join(body))
+        '<div class="table-wrap"><table class="%s" aria-label="%s">\n'
+        "<thead><tr>%s</tr></thead>\n<tbody>\n%s\n</tbody>\n</table></div>\n"
+        % (layout, _e(label), head, "\n".join(body))
     )
 
 
@@ -370,17 +388,18 @@ def _evidence(data: Mapping[str, Any], labels: Mapping[str, str]) -> str:
             % _e("Share of modeled value by evidence: " + described)
         )
         for level, plural, share in shares:
-            if share <= 0:
+            grow = "%.1f" % (share * 100)
+            if grow == "0.0":
                 continue
             # A sliver too narrow for its label keeps the number in the
-            # legend and the tooltip rather than overflowing the bar.
-            thin = share < 0.08
+            # legend and the tooltip rather than clipping it in the bar.
+            thin = share < THIN_SEGMENT
             out.append(
                 '<span class="%s%s" style="flex: %s 1 0" title="%s: %s of modeled value">%s</span>'
                 % (
                     level,
                     " thin" if thin else "",
-                    ("%.1f" % (share * 100)),
+                    grow,
                     _e(plural),
                     _e(fmt_pct(share)),
                     "" if thin else _e(fmt_pct(share)),
@@ -532,10 +551,11 @@ def _tornado(
                 % (_pc(frac(hi_value)), _e(money(hi_value)))
             )
         if not plot:
-            tips.append("no change across the range")
+            # The input moves nothing. Say so beside the base line, toward the
+            # middle of the axis, so the note never needs a gutter of its own.
             plot.append(
-                '<span class="tip hi" style="left: %s">no change across the range</span>'
-                % _pc(base_at)
+                '<span class="tip %s quiet" style="left: %s">no change</span>'
+                % ("hi" if base_at <= 0.5 else "lo", _pc(base_at))
             )
         flag = ""
         if row["flips_decision"]:
@@ -567,8 +587,24 @@ def _tornado(
         )
 
     ticks = [(t, tick_label(t, scale.exponent, money.currency)) for t in scale.ticks]
-    # The gutters either side of the plot must hold the widest end label.
-    gutter = max(_text_width(t, 12.5) for t in tips) + 14
+    # The gutters either side of the plot must hold the widest end label: a
+    # bar can end at either edge of the axis, and its label sits outside it.
+    gutter = max([_text_width(t, 12.5) for t in tips] or [0.0]) + 14
+    caption = (
+        "Net present value when one input moves to the low or high end of its "
+        "stated range."
+    )
+    # The axis spans the data, not zero, so say when zero is off the chart.
+    if scale.lo > 0:
+        caption += (
+            " The axis does not start at zero: no input takes NPV below zero at "
+            "either end of its range."
+        )
+    elif scale.hi < 0:
+        caption += (
+            " The axis does not reach zero: no input lifts NPV above zero at "
+            "either end of its range."
+        )
     base_label = "Base case %s" % money(base)
     anchor = "start" if base_at < 0.18 else ("end" if base_at > 0.82 else "mid")
     lines = "".join(
@@ -591,8 +627,7 @@ def _tornado(
         '<div class="t-top"><span class="%s" style="left: %s">%s</span></div>\n'
         '<div class="t-lines">%s<i class="base" style="left: %s"></i></div>\n'
         '%s<div class="t-axis">%s</div>\n</div>\n%s'
-        "<figcaption>Net present value when one input moves to the low or high end "
-        "of its stated range.</figcaption>\n</figure>\n"
+        "<figcaption>%s</figcaption>\n</figure>\n"
         % (
             _e(aria),
             math.ceil(gutter),
@@ -609,6 +644,7 @@ def _tornado(
                     ("sw above", "NPV above the base case"),
                 ]
             ),
+            _e(caption),
         )
     )
 
@@ -625,16 +661,32 @@ def _cash_flow(case: Any, data: Mapping[str, Any], money: _Money) -> str:
             money(running[-1]),
         )
     )
-    rows = [
+    headers = [
+        ("Period", "nowrap"),
+        ("Benefit", "n"),
+        ("Cost", "n"),
+        ("Net", "n"),
+        ("Cumulative", "n"),
+    ]
+    texts = [
         [
-            _e(periods[i]),
-            _e(money(benefits[i])),
-            _e(money(-costs[i])),
-            _e(money(net[i])),
-            _e(money(running[i])),
+            periods[i],
+            money(benefits[i]),
+            money(-costs[i]),
+            money(net[i]),
+            money(running[i]),
         ]
         for i in range(len(periods))
     ]
+    # Five columns fit a 375px phone at the compact size unless the amounts
+    # are long (a code such as "CHF " before each one); then every period
+    # becomes a card of four labelled values on any phone.
+    needed = PHONE_CELL_PADDING + sum(
+        max([_text_width(h, 11.0)] + [_text_width(row[i], 12.0) for row in texts])
+        for i, (h, _) in enumerate(headers)
+    )
+    layout = "compact" if needed <= PHONE_CONTENT_WIDTH else "compact cards"
+    rows = [[_e(cell) for cell in row] for row in texts]
     return "".join(
         [
             '<section aria-labelledby="h-cash">\n<h2 id="h-cash">Cash flow</h2>\n',
@@ -652,17 +704,7 @@ def _cash_flow(case: Any, data: Mapping[str, Any], money: _Money) -> str:
                 ]
             ),
             "</figure>\n",
-            _table(
-                "Cash flow by period",
-                [
-                    ("Period", "nowrap"),
-                    ("Benefit", "n"),
-                    ("Cost", "n"),
-                    ("Net", "n"),
-                    ("Cumulative", "n"),
-                ],
-                rows,
-            ),
+            _table("Cash flow by period", headers, rows, layout=layout),
             "</section>\n",
         ]
     )
@@ -729,6 +771,10 @@ def _cash_svg(
         width - 20.0,
         (width - 16.0 - 12.0 - end_width - left * half) / (1 - half),
     )
+    # Only a currency code far longer than ISO's three letters gets here: keep
+    # the drawing valid and leave the labels to the table below it.
+    left = min(left, width * 0.4)
+    right = max(right, left + (width - 20.0 - left) * 0.5)
     top, bottom = 24.0, height - 50.0
     slot = (right - left) / count
     bar = min(24.0, slot * 0.42)
@@ -827,8 +873,13 @@ def _cash_svg(
         names, every = short, 1
     else:
         names, every = short, 2
+    shown = set(range(0, count, every))
+    if count - 1 not in shown:
+        # Always name the last period; drop its neighbour to make room.
+        shown.discard(count - 2)
+        shown.add(count - 1)
     for i, name in enumerate(names):
-        if i % every == 0 or i == count - 1:
+        if i in shown:
             out.append(
                 '<text x="%s" y="%s" text-anchor="middle">%s</text>'
                 % (_n(centers[i]), _n(height - 8), _e(name))
@@ -892,18 +943,21 @@ def _attribution(data: Mapping[str, Any], money: _Money) -> str:
         share = abs(value) / biggest if biggest > 0 and _finite(value) else 0.0
         negative = negative or (_finite(value) and value < 0)
         out.append(
-            '<div class="r-name"><code>%s</code><span>%s · %s of driver</span></div>'
+            '<div class="r-name"><code>%s</code><span>%s</span></div>'
             '<div class="r-plot"><i class="r-bar %s" style="width: %s" title="%s"></i>'
             '<span class="r-val" style="left: %s">%s</span></div>\n'
             % (
                 _e(row["input"]),
                 _e(row["driver_label"]),
-                _e(fmt_pct(row["share_of_driver"])),
                 _e(row["confidence"]),
                 _pc(share),
                 _e(
-                    "%s: %s"
-                    % (singular.get(row["confidence"], row["confidence"]), text)
+                    "%s: %s, %s of this driver's NPV"
+                    % (
+                        singular.get(row["confidence"], row["confidence"]),
+                        text,
+                        fmt_pct(row["share_of_driver"]),
+                    )
                 ),
                 _pc(share),
                 _e(text),
@@ -978,7 +1032,7 @@ def _ledger(case: Any) -> str:
             "Assumption ledger",
             [
                 ("Input", "label"),
-                ("Value", "n"),
+                ("Value", "n wrap"),
                 ("Confidence", ""),
                 ("Range", "nowrap"),
                 ("Source", "src"),
@@ -997,7 +1051,9 @@ def _costs(case: Any, money: _Money) -> str:
     return (
         '<section aria-labelledby="h-costs">\n<h2 id="h-costs">Cost lines</h2>\n'
         '<p class="lede">Each cost the case carries, summed across the horizon.</p>\n'
-        + _table("Cost lines", [("Cost", "label"), ("Total", "n"), ("Note", "src")], rows)
+        + _table(
+            "Cost lines", [("Cost", "label"), ("Total", "n"), ("Note", "src")], rows
+        )
         + "</section>\n"
     )
 
@@ -1159,6 +1215,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; ov
 .tip { position: absolute; top: 50%; transform: translateY(-50%); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 .tip.lo { transform: translate(-100%, -50%); padding-right: 7px; }
 .tip.hi { padding-left: 7px; }
+.tip.quiet { font-weight: 400; color: var(--muted); }
 .t-lines { position: absolute; top: 22px; bottom: 28px; left: calc(var(--label) + var(--gut)); right: var(--gut); pointer-events: none; }
 .t-lines i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid); }
 .t-lines i.zero { background: var(--axis); }
@@ -1207,8 +1264,9 @@ tr:last-child td { border-bottom: 0; }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 0; padding-left: 12px; overflow-wrap: normal; }
 td.n:not(:last-child), th.n:not(:last-child) { padding-right: 16px; }
 td.nowrap { white-space: nowrap; overflow-wrap: normal; }
-td.label { min-width: 9em; }
-td.src { color: var(--ink-2); min-width: 220px; overflow-wrap: anywhere; }
+td.n.wrap { white-space: normal; min-width: 6em; }
+td.label { min-width: 8em; }
+td.src { color: var(--ink-2); min-width: 200px; overflow-wrap: anywhere; }
 td .under { display: block; color: var(--muted); font-size: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
 .floor { border-left: 3px solid var(--critical); border-radius: 0 12px 12px 0; }
@@ -1233,16 +1291,55 @@ footer a { color: inherit; }
   /* The name sits above its bar here; mask the grid lines behind it. */
   .t-name { padding: 10px 0 0; position: relative; z-index: 1; background: var(--surface); }
   .ranked { grid-template-columns: 1fr; row-gap: 3px; }
+  .seg > span { padding: 0 6px; }
   .r-plot { margin-bottom: 8px; }
   .grade { grid-template-columns: 1fr; }
   .cash svg.wide { display: none; }
   .cash svg.narrow { display: block; }
+  /* One card per row: every value beside its column name, nothing to scroll. */
+  table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  table.stack, table.stack tbody, table.stack tr { display: block; }
+  table.stack tr { padding: 10px 0; border-bottom: 1px solid var(--grid); }
+  table.stack tr:last-child { border-bottom: 0; }
+  table.stack td, table.stack td.n, table.stack td.label, table.stack td.src { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); column-gap: 12px; padding: 2px 0; border: 0; text-align: left; white-space: normal; min-width: 0; }
+  table.stack td::before { content: attr(data-label); color: var(--muted); font-size: 12px; line-height: 1.75; }
+  table.stack td:first-child { display: block; padding-bottom: 6px; font-weight: 600; }
+  table.stack td:first-child .under { font-weight: 400; }
+  table.stack td:first-child::before { content: none; }
 }
+@media screen and (max-width: 560px) {
+  table.compact { font-size: 12px; }
+  table.compact th { font-size: 11px; }
+  table.compact td, table.compact th { padding-right: 8px; }
+  table.compact td.n, table.compact th.n, table.compact td.n:not(:last-child), table.compact th.n:not(:last-child) { padding-left: 4px; padding-right: 0; }
+}
+@media screen and (max-width: 359px) {
+%(compact)s}
+@media screen and (max-width: 560px) {
+%(cards)s}
 @media print {
   :root { color-scheme: light; --page: #fff; --surface: #fff; --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6d68; --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,.14); --wash: rgba(11,11,11,.035); --fact: #104281; --inference: #2a78d6; --assumption: #86b6ef; --on-fact: #fff; --on-inference: #fff; --on-assumption: #0b0b0b; --above: #2a78d6; --below: #e34948; --critical: #d03b3b; }
   body { font-size: 11pt; }
   .report { max-width: none; padding: 0; }
+  .table-wrap { overflow: visible; }
   section { break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 """
+
+# Too narrow for five columns: each period becomes a card of four values.
+# Applied below 360px to every compact table, and below 560px to the ones
+# whose amounts are too long for five columns at 375px.
+_CARDS = """\
+  table.%(t)s thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%%); white-space: nowrap; }
+  table.%(t)s, table.%(t)s tbody { display: block; }
+  table.%(t)s tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+  table.%(t)s tr:last-child { border-bottom: 0; }
+  table.%(t)s td, table.%(t)s td.n, table.%(t)s td.n:not(:last-child) { display: block; padding: 0; border: 0; text-align: left; }
+  table.%(t)s td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 11px; }
+  table.%(t)s td:first-child { grid-column: 1 / -1; font-weight: 600; }
+  table.%(t)s td:first-child::before { content: none; }
+"""
+CSS = CSS.replace("%(compact)s", _CARDS % {"t": "compact"}).replace(
+    "%(cards)s", _CARDS % {"t": "compact.cards"}
+)

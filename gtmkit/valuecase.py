@@ -83,6 +83,29 @@ __all__ = [
     "validate_spec",
 ]
 
+# Sentences the markdown brief and the HTML report (gtmkit.report) both print,
+# defined once so the two renderers cannot drift apart.
+NO_RANGE_NOTE = (
+    "No input declared a range, so no sensitivity could be run. Add low/high "
+    "bounds to the assumptions — a case without a stated range invites the "
+    "reader to invent their own."
+)
+FLOOR_NOTE = (
+    "Every ranged input simultaneously at its unfavorable bound. This is a "
+    "stress test, not a forecast or a guaranteed minimum. Bounds are selected "
+    "one at a time against the base; interactions and non-monotonic formulas "
+    "may produce worse outcomes within the ranges."
+)
+# (verdict, what to do with it). The markdown bolds the verdict.
+FLOOR_HOLDS = (
+    "The case still clears zero even at the floor.",
+    " That is the strongest sentence available here — lead with it.",
+)
+FLOOR_FAILS = (
+    "The case goes negative at the floor. Say so, and name which input has to "
+    "hold for it not to."
+)
+
 
 class SpecError(ValueError):
     """Raised when a business-case spec is structurally invalid."""
@@ -631,21 +654,12 @@ class ValueCase:
                 )
             )
         else:
-            lines.append(
-                "_No input declared a range, so no sensitivity could be run. "
-                "Add low/high bounds to the assumptions — a case without a "
-                "stated range invites the reader to invent their own._"
-            )
+            lines.append("_%s_" % NO_RANGE_NOTE)
         lines.append("")
 
         lines.append("## Floor case")
         lines.append("")
-        lines.append(
-            "Every ranged input simultaneously at its unfavorable bound. This "
-            "is a stress test, not a forecast or a guaranteed minimum. Bounds "
-            "are selected one at a time against the base; interactions and "
-            "non-monotonic formulas may produce worse outcomes within the ranges."
-        )
+        lines.append(FLOOR_NOTE)
         lines.append("")
         lines.append(
             "- NPV at the floor: **%s** (%s vs base)"
@@ -660,13 +674,7 @@ class ValueCase:
         )
         lines.append(
             "- %s"
-            % (
-                "**The case still clears zero even at the floor.** That is the "
-                "strongest sentence available here — lead with it."
-                if floor["still_positive"]
-                else "The case goes negative at the floor. Say so, and name "
-                "which input has to hold for it not to."
-            )
+            % ("**%s**%s" % FLOOR_HOLDS if floor["still_positive"] else FLOOR_FAILS)
         )
         lines.append("")
 
