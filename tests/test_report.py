@@ -710,6 +710,14 @@ class TestEdgeCases(unittest.TestCase):
         self.assertIn(">not meaningful for this cash flow shape</div>", never)
         self.assertIn('class="value num long"', never)
 
+    def test_a_value_in_words_gets_the_text_size(self):
+        """At figure size "immediate" broke mid-word in a 320px phone's tile."""
+        html = render(edge_cases()["all-positive cash flows"])
+        self.assertIn('<div class="value num long">immediate</div>', html)
+        northwind = load_spec(EXAMPLE).to_html()
+        self.assertIn('<div class="value num">2 yr 4 mo</div>', northwind)
+        self.assertIn('<div class="value num">32%</div>', northwind)
+
     def test_no_ranges_explains_instead_of_charting(self):
         html = render(edge_cases()["no sensitivity rows"])
         self.assertIn(report.NO_RANGE_NOTE, unescape(html))

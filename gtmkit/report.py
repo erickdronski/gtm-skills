@@ -414,7 +414,10 @@ def _headline(case: Any) -> str:
     for label, text in tiles:
         # A sentence such as "never within the modeled horizon" is the honest
         # value for some cases; it gets a text size rather than a truncation.
-        long = " long" if len(text) > 14 else ""
+        # So does a value in words ("immediate", "n/a"): at figure size one
+        # word can outgrow a 320px phone's tile, and must not break mid-word.
+        words = not any(ch.isdigit() for ch in text)
+        long = " long" if len(text) > 14 or words else ""
         out.append(
             '<div class="kpi"><div class="label">%s</div>'
             '<div class="value num%s">%s</div></div>\n' % (_e(label), long, _e(text))
