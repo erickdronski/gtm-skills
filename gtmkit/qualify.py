@@ -39,14 +39,17 @@ import json
 import os
 import re
 import sys
+from importlib import resources
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from .cli import emit, open_input
 from .evidence import MIN_SOURCE_CHARS, weasel_phrases
 from .fmt import fmt_currency, fmt_pct, table
 from .scoring import Rubric, RubricError, score_record
 
 __all__ = [
     "DEFAULT_RUBRIC",
+    "PACKAGED_RUBRIC",
     "STATUSES",
     "QualificationRubric",
     "QualifyError",
@@ -63,7 +66,8 @@ _STATUS_RANK = {"unknown": 0, "assumed": 1, "stated": 2, "confirmed": 3}
 
 #: The shipped rubric, located relative to the package so the same path works
 #: from a clone and from an installed plugin, where gtmkit/ and skills/ ship
-#: side by side.
+#: side by side. This copy, the one the skill documents, is read when it is
+#: there, so an edit to it takes effect.
 DEFAULT_RUBRIC = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "skills",
@@ -71,6 +75,11 @@ DEFAULT_RUBRIC = os.path.join(
     "assets",
     "meddpicc-rubric.json",
 )
+
+#: A pip install carries the package without skills/, so the same rubric also
+#: ships inside it, at gtmkit/data/meddpicc-rubric.json, and is read when
+#: DEFAULT_RUBRIC is not there. A test keeps the two copies byte-for-byte equal.
+PACKAGED_RUBRIC = ("data", "meddpicc-rubric.json")
 
 _ELEMENT_KEYS = ("level", "status", "source", "by", "basis", "notes")
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -291,20 +300,43 @@ class QualificationRubric:
         return self.stages[self.stage_index[stage_id]][1]
 
 
+def _shipped_rubric() -> Tuple[str, str]:
+    """Where the shipped rubric was read from, and its text.
+
+    The skill's copy wins when it is there (a clone or an installed plugin);
+    a pip install has only the copy inside the package.
+    """
+    try:
+        with open(DEFAULT_RUBRIC, "r", encoding="utf-8") as handle:
+            return DEFAULT_RUBRIC, handle.read()
+    except FileNotFoundError:
+        pass
+    packaged = resources.files("gtmkit")
+    for part in PACKAGED_RUBRIC:
+        packaged = packaged.joinpath(part)
+    try:
+        return str(packaged), packaged.read_bytes().decode("utf-8")
+    except OSError:
+        raise QualifyError(
+            "the shipped MEDDPICC rubric is missing: it is neither at %s nor "
+            "inside the installed package. Reinstall gtm-skills, or pass "
+            "--rubric with the path to a rubric file" % DEFAULT_RUBRIC
+        )
+
+
 def load_rubric(path: Optional[str] = None) -> QualificationRubric:
     """Load a qualification rubric, defaulting to the shipped MEDDPICC one."""
-    target = path or DEFAULT_RUBRIC
+    if path is None:
+        target, text = _shipped_rubric()
+    else:
+        target = path
+        try:
+            with open_input(target, QualifyError) as handle:
+                text = handle.read()
+        except FileNotFoundError:
+            raise QualifyError("no such rubric file: %s" % target)
     try:
-        with open(target, "r", encoding="utf-8") as handle:
-            raw = json.load(handle)
-    except FileNotFoundError:
-        if path is None:
-            raise QualifyError(
-                "the shipped MEDDPICC rubric was not found at %s. Pass --rubric "
-                "with the path to skills/deal-qualification/assets/"
-                "meddpicc-rubric.json" % target
-            )
-        raise QualifyError("no such rubric file: %s" % target)
+        raw = json.loads(text)
     except json.JSONDecodeError as exc:
         raise QualifyError("%s is not valid JSON: %s" % (target, exc)) from exc
     return QualificationRubric(raw)
@@ -1208,9 +1240,9 @@ def to_markdown(result: Mapping[str, Any]) -> str:
 # -- CLI -----------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.qualify",
+        prog=prog or "python3 -m gtmkit.qualify",
         description=(
             "Score one deal against MEDDPICC, keeping what is confirmed apart "
             "from what is only believed, and name the next thing to confirm."
@@ -1229,7 +1261,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         rubric = load_rubric(args.rubric)
-        with open(args.deal, "r", encoding="utf-8") as handle:
+        with open_input(args.deal, QualifyError) as handle:
             spec = json.load(handle)
         as_of = _parse_date(args.as_of, "--as-of") if args.as_of else None
         result = qualify(spec, rubric, as_of)
@@ -1246,13 +1278,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     output = (
         json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

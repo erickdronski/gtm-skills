@@ -82,6 +82,9 @@ PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.valuecase case.json --check
 
 # Full model as JSON, for building your own view on top:
 PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.valuecase case.json --format json
+
+# One self-contained HTML file for a reader who will not open the spec:
+PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.valuecase case.json --format html --out case.html
 ```
 
 Run `--check` before generating output. The validator's error messages are
@@ -141,7 +144,8 @@ ranges; this stress scenario is not a guaranteed minimum.
 
 ### 5. Write the narrative around the model
 
-The generated markdown is the appendix, not the pitch. Lead with:
+The generated markdown is the appendix, not the pitch; the HTML report
+(`--format html`) is the same appendix in a form you can attach. Lead with:
 
 1. The decision being asked for, and by when.
 2. The headline number, with its payback period.

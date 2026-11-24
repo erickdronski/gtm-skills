@@ -76,6 +76,22 @@ class TestIRR(unittest.TestCase):
         # -100 today, 110 in one period => exactly 10%.
         self.assertAlmostEqual(finance.irr([-100, 110]), 0.10, places=6)
 
+    def test_ten_year_monthly_series(self):
+        for monthly_rate in (0.01, -0.01):
+            with self.subTest(monthly_rate=monthly_rate):
+                flows = [-1000] + [0] * 119 + [1000 * (1 + monthly_rate) ** 120]
+                result = finance.summarize(flows, 0.005, periods_per_year=12)
+                self.assertAlmostEqual(result["irr_per_period"], monthly_rate, places=8)
+                self.assertAlmostEqual(
+                    result["irr_annual"], (1 + monthly_rate) ** 12 - 1, places=8
+                )
+
+    def test_amount_scale_and_zero_padding_do_not_change_the_rate(self):
+        for scale in (1e-180, 1.0, 1e180):
+            with self.subTest(scale=scale):
+                flows = [0] * 120 + [-100 * scale, 110 * scale] + [0] * 120
+                self.assertAlmostEqual(finance.irr(flows), 0.10, places=8)
+
     def test_all_positive_has_no_irr(self):
         self.assertIsNone(finance.irr([100, 100, 100]))
 
@@ -228,6 +244,29 @@ class TestSummarize(unittest.TestCase):
             "total_benefit",
         ):
             self.assertIn(key, result)
+
+
+class TestTotalsAreTheSameOnEveryPython(unittest.TestCase):
+    """From Python 3.12 the built-in sum() adds floats with compensated
+    summation, so totals differed in their last bits between 3.9-3.11 and
+    3.12+, and one on a rounding boundary printed as $619.4k on one and
+    $619.5k on the other. Totals are exactly rounded (math.fsum) instead."""
+
+    # Four cost years in cents that add up to exactly 619,450.00.
+    CENTS = (69151.48, 166414.54, 318846.41, 65037.57)
+
+    def test_npv_and_totals_are_exactly_rounded(self):
+        self.assertEqual(finance.npv(0.0, self.CENTS), 619450.0)
+        benefits = [0.0, 400000.0, 400000.0, 400000.0]
+        summary = finance.summarize(
+            [b - c for b, c in zip(benefits, self.CENTS)],
+            0.0,
+            benefit_flows=benefits,
+            cost_flows=self.CENTS,
+        )
+        self.assertEqual(summary["total_investment"], 619450.0)
+        self.assertEqual(summary["net_cash"], 1200000.0 - 619450.0)
+        self.assertEqual(finance.roi([*(-v for v in self.CENTS), 619450.0]), 0.0)
 
 
 class TestFiniteFinance(unittest.TestCase):

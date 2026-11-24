@@ -40,7 +40,7 @@ PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -m gtmkit.valuecase case.json --check
 | `currency` | no | ISO code, defaults to `USD`. Drives the symbol only; no conversion happens. |
 | `horizon_years` | yes | Integer, 1–10. |
 | `discount_rate_annual` | yes | Decimal between -0.5 and 1.0. `0.12`, never `12`. |
-| `meta` | no | Free-form object, passed through to JSON output. |
+| `meta` | no | Free-form object, passed through to JSON output. The HTML report lists its fields under the title, `prepared_for`, `prepared_by`, `decision_date` and `status` first; any other key is shown in the case you wrote it, with underscores as spaces (`ARR_at_risk` reads "ARR at risk"). |
 | `shared_inputs` | no | Named input definitions used by explicit `ref` entries in drivers. |
 | `drivers` | yes | Non-empty array. |
 | `costs` | yes | Non-empty array. |

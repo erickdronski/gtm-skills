@@ -34,6 +34,7 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from .cli import emit, open_input
 from .fmt import fmt_count, fmt_currency, table
 
 __all__ = ["PricingError", "analyze", "main"]
@@ -347,9 +348,9 @@ def to_markdown(result: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.pricing",
+        prog=prog or "python3 -m gtmkit.pricing",
         description=(
             "Van Westendorp price sensitivity from a CSV of survey responses."
         ),
@@ -365,10 +366,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        with open(args.responses, "r", encoding="utf-8-sig", newline="") as handle:
+        with open_input(args.responses, PricingError, "utf-8-sig", "") as handle:
             rows = list(csv.DictReader(handle))
     except FileNotFoundError:
         sys.stderr.write("no such file: %s\n" % args.responses)
+        return 2
+    except PricingError as exc:
+        sys.stderr.write("pricing error: %s\n" % exc)
         return 2
 
     if not rows:
@@ -384,13 +388,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     output = (
         json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: tests (${{ matrix.os }} · python ${{ matrix.python-version }})
@@ -56,6 +59,11 @@ jobs:
           python-version: "3.12"
       - name: Business case
         run: python -m gtmkit.valuecase examples/value-case/northwind-support-deflection.json --check
+      - name: Business case as an HTML report
+        run: |
+          python -m gtmkit.valuecase examples/value-case/northwind-support-deflection.json \
+            --format html --out "$RUNNER_TEMP/northwind.html"
+          grep -q '\$105\.2k' "$RUNNER_TEMP/northwind.html"
       - name: ICP scoring
         run: python -m gtmkit.scoring --rubric examples/icp/rubric.json --records examples/icp/accounts.csv
       - name: MEDDPICC rubric is valid
@@ -79,6 +87,34 @@ jobs:
           python -m gtmkit.funnel --target-revenue 4000000 --acv 45000 \
             --stage "visit:0.08" --stage "mql:0.25" --stage "opp:0.28" \
             --cpm 22 --audience-ceiling 40000000
+
+  installed:
+    name: installed gtmkit command
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the wheel and install it
+        run: |
+          python -m pip wheel . --no-deps -w dist
+          python -m pip install dist/*.whl
+      # Outside the checkout nothing can be imported from the source tree, so
+      # this is what someone who ran pip install gets.
+      - name: Run the installed command outside the repository
+        working-directory: ${{ runner.temp }}
+        run: |
+          gtmkit --version
+          gtmkit
+          gtmkit init value-case --out case.json
+          gtmkit valuecase case.json --check
+          gtmkit valuecase case.json --format html --out case.html
+          grep -q '\$105\.2k' case.html
+          gtmkit init deal --out deal.json
+          gtmkit qualify deal.json
+          gtmkit init sizing --out market.json
+          gtmkit sizing --spec market.json
 
   lint-python:
     name: lint (ruff)

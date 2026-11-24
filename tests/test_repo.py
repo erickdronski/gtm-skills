@@ -128,6 +128,30 @@ class TestEngineCommandsInDocs(unittest.TestCase):
         )
         self.assertEqual(errors, [])
 
+    def test_front_door_commands_are_checked(self):
+        errors = self.lint("```bash\ngtmkit scoring --rubrik r.json\n```")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("gtmkit scoring --rubrik", errors[0])
+
+    def test_front_door_command_with_real_flags_passes(self):
+        errors = self.lint(
+            "```bash\n$ gtmkit valuecase case.json --format html --out c.html\n"
+            "gtmkit init value-case --out case.json --force\n```\n"
+            "Inline works too: `gtmkit sizing --spec m.json`."
+        )
+        self.assertEqual(errors, [])
+
+    def test_front_door_init_flags_are_checked(self):
+        errors = self.lint("```bash\ngtmkit init deal --output d.json\n```")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("--output", errors[0])
+
+    def test_prose_mentioning_gtmkit_is_not_a_command(self):
+        errors = self.lint(
+            "The engine is gtmkit evidence-first, and gtmkit fmt helpers exist."
+        )
+        self.assertEqual(errors, [])
+
     def test_flags_are_read_from_the_cli_definition(self):
         flags = validate_skills.module_flags("scoring")
         self.assertTrue({"--rubric", "--records", "--name-field"} <= flags)
@@ -310,6 +334,84 @@ class TestReadmeStaysHonest(unittest.TestCase):
                 )
                 self.assertIn(quoted, self.readme)
 
+    def test_quoted_value_case_brief_is_the_example_output(self):
+        """The README's brief excerpt is generated output: every line of it,
+        the whole headline table, and every word of the evidence section, in
+        order. Only long lines are wrapped."""
+        case = valuecase.load_spec(
+            os.path.join(EXAMPLES, "value-case", "northwind-support-deflection.json")
+        )
+        markdown = case.to_markdown()
+        start = self.readme.index("## Headline")
+        excerpt = self.readme[start : self.readme.index("```", start)]
+        lines = [line for line in excerpt.splitlines() if line.strip()]
+        self.assertGreaterEqual(len(lines), 15)
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertIn(line, markdown)
+
+        def section(text, heading):
+            return text.split(heading, 1)[1].split("\n## ", 1)[0]
+
+        produced = section(markdown, "## Headline")
+        self.assertEqual(
+            [line for line in section(excerpt, "## Headline").splitlines() if line],
+            [line for line in produced.splitlines() if line],
+            "the README's headline table leaves out or changes a row",
+        )
+        self.assertEqual(
+            " ".join(section(excerpt, "## Evidence grade").split()),
+            " ".join(section(markdown, "## Evidence grade").split()),
+        )
+
+    def test_share_it_screenshot_is_shipped_small_and_reproducible(self):
+        start = self.readme.index("## Share it")
+        share = self.readme[start : self.readme.index("\n## ", start + 1)]
+        self.assertRegex(
+            share,
+            r"python3 -m gtmkit\.valuecase "
+            r"examples/value-case/northwind-support-deflection\.json \\\n"
+            r"\s+--format html --out \S+\.html",
+        )
+        image = re.search(r"!\[[^\]]+\]\((assets/[^)]+\.png)\)", share)
+        self.assertIsNotNone(image, "the Share it section shows no screenshot")
+        path = os.path.join(REPO_ROOT, image.group(1))
+        self.assertLess(os.path.getsize(path), 400 * 1024)
+        with open(path, "rb") as handle:
+            header = handle.read(24)
+        self.assertEqual(header[:8], b"\x89PNG\r\n\x1a\n")
+        width = int.from_bytes(header[16:20], "big")
+        self.assertTrue(1100 <= width <= 1300, "screenshot is %dpx wide" % width)
+
+    def test_quoted_icp_table_is_the_scorer_output(self):
+        """The ICP excerpt is the example's output: every row, in order, with
+        only the Notes column left out and long lines wrapped. It used to be
+        a paraphrase with shortened names, rewritten notes and three rows
+        missing."""
+        with open(
+            os.path.join(EXAMPLES, "icp", "rubric.json"), encoding="utf-8"
+        ) as handle:
+            rubric = scoring.Rubric(json.load(handle))
+        records = scoring.load_records(os.path.join(EXAMPLES, "icp", "accounts.csv"))
+        markdown = scoring.to_markdown(
+            rubric, scoring.score_all(rubric, records), "name"
+        )
+        start = self.readme.index("| Record ")
+        fence = self.readme.rindex("```\n", 0, start)
+        excerpt = self.readme[fence + 4 : self.readme.index("```", start)]
+        lines = [line for line in excerpt.splitlines() if line.strip()]
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertIn(line, markdown)
+        quoted = [line for line in lines if line.startswith("|")]
+        produced = [line for line in markdown.splitlines() if line.startswith("|")]
+        self.assertEqual(len(quoted), len(produced), "a row is missing")
+        for row, full in zip(quoted, produced):
+            self.assertTrue(full.startswith(row), (row, full))
+            self.assertEqual(row.count("|"), 5, "Record, Tier, Fit, Coverage")
+        self.assertIn("Notes column left out", self.readme[:fence])
+        self.assertIn("## Research these before ranking them", excerpt)
+
     def test_quoted_qualification_verdict_matches_the_example(self):
         """Every line of the README's verdict excerpt must still be generated."""
         with open(
@@ -354,6 +456,28 @@ class TestReadmeStaysHonest(unittest.TestCase):
             claimed,
             "README claims %d tests but only %d exist" % (claimed, actual),
         )
+
+
+class TestSecurityPolicy(unittest.TestCase):
+    """SECURITY.md names everything an untrusted spec can reach."""
+
+    def setUp(self):
+        with open(os.path.join(REPO_ROOT, "SECURITY.md"), encoding="utf-8") as handle:
+            self.policy = handle.read()
+
+    def test_the_html_report_is_in_scope(self):
+        """The report renders spec strings into a file meant to be forwarded;
+        a reporter must not read it as out of scope."""
+        self.assertIn("**The HTML report.**", self.policy)
+        self.assertIn("--format html", self.policy)
+        self.assertIn("`TestEscaping` in `tests/test_report.py`", self.policy)
+        from tests import test_report
+
+        self.assertTrue(issubclass(test_report.TestEscaping, unittest.TestCase))
+
+    def test_formula_evaluation_is_still_in_scope(self):
+        self.assertIn("**Formula evaluation.**", self.policy)
+        self.assertIn("`tests/test_expr.py`", self.policy)
 
 
 class TestPluginManifests(unittest.TestCase):

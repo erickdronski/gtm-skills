@@ -5,11 +5,16 @@ a repo whose README shows numbers the code no longer produces is worse than one
 with no README at all.
 """
 
+import contextlib
+import io
 import json
 import os
+import re
+import tempfile
 import unittest
 from copy import deepcopy
 
+from gtmkit import valuecase
 from gtmkit.valuecase import SpecError, load_spec, validate_spec
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,6 +64,37 @@ def minimal_spec(**overrides):
     }
     spec.update(overrides)
     return spec
+
+
+def one_year_spec(cost, b=None):
+    """A year at 0%: benefit a * b = 1000 in year 1 against ``cost`` today."""
+    return {
+        "name": "One-year case",
+        "horizon_years": 1,
+        "discount_rate_annual": 0,
+        "drivers": [
+            {
+                "id": "d1",
+                "label": "Driver one",
+                "formula": "a * b",
+                "inputs": {
+                    "a": {
+                        "value": 1000,
+                        "confidence": "fact",
+                        "source": "Warehouse export dated 2026-01-01",
+                    },
+                    "b": b
+                    or {
+                        "value": 1,
+                        "confidence": "fact",
+                        "source": "Contract schedule signed 2026-02-01",
+                    },
+                },
+                "realization": 1.0,
+            }
+        ],
+        "costs": [{"id": "c", "label": "Cost", "schedule": [cost, 0]}],
+    }
 
 
 class TestCashFlows(unittest.TestCase):
@@ -197,6 +233,45 @@ class TestSensitivity(unittest.TestCase):
         rows = validate_spec(spec).sensitivity()
         swings = [r["swing"] for r in rows]
         self.assertEqual(swings, sorted(swings, reverse=True))
+
+
+class TestBriefSaysWhatItLeavesOut(unittest.TestCase):
+    """The markdown brief lists at most 12 rows per table and counts the rest."""
+
+    def test_short_tables_carry_no_note(self):
+        markdown = validate_spec(minimal_spec()).to_markdown()
+        self.assertNotIn("are not listed here", markdown)
+
+    def test_long_tables_say_how_many_rows_were_left_out(self):
+        spec = minimal_spec()
+        driver = spec["drivers"][0]
+        for i in range(14):
+            driver["inputs"]["x%d" % i] = {
+                "value": 1.0,
+                "confidence": "assumption",
+                "source": "Calibration factor %d from the pilot readout, table 3" % i,
+                "low": 0.9,
+                "high": 1.1 + i * 0.01,
+            }
+        driver["formula"] += "".join(" * x%d" % i for i in range(14))
+        case = validate_spec(spec)
+        self.assertEqual(len(case.sensitivity()), 15)
+        self.assertEqual(len(case.evidence_by_input()), 17)
+        markdown = case.to_markdown()
+        self.assertIn(
+            "_3 more ranged inputs that move NPV less are not listed here; "
+            "`--format html` and `--format json` include every one._",
+            markdown,
+        )
+        self.assertIn(
+            "_5 more inputs carrying less value are not listed here;", markdown
+        )
+        attribution = markdown.split("## Where the value actually comes from")[1]
+        attribution = attribution.split("\n## ")[0]
+        self.assertEqual(attribution.count("| Driver one / "), 12)
+        html = case.to_html()
+        self.assertEqual(html.count('<div class="t-row">'), 15)
+        self.assertEqual(html.count('<div class="r-plot">'), 17)
 
 
 class TestSharedInputs(unittest.TestCase):
@@ -360,6 +435,127 @@ class TestSpecValidation(unittest.TestCase):
         self.assertIn("d1", str(ctx.exception))
 
 
+class TestCommandLineErrors(unittest.TestCase):
+    """Problems found while loading or computing a spec are one line, exit 2."""
+
+    def test_a_range_bound_that_breaks_the_formula_is_a_spec_error(self):
+        raw = minimal_spec()
+        raw["drivers"][0]["formula"] = "volume * unit_value / rate"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "case.json")
+            raw["drivers"][0]["inputs"]["rate"]["low"] = 0
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(raw, handle)
+            for extra in (["--check"], ["--format", "html"]):
+                with self.subTest(args=extra):
+                    out, err = io.StringIO(), io.StringIO()
+                    with (
+                        contextlib.redirect_stdout(out),
+                        contextlib.redirect_stderr(err),
+                    ):
+                        self.assertEqual(valuecase.main([path, *extra]), 2)
+                    self.assertEqual(out.getvalue(), "")
+                    self.assertIn("spec error: division by zero", err.getvalue())
+
+    def test_meta_must_be_an_object(self):
+        # Falsy non-objects too: `[]`, `0`, `false` and `""` are not objects.
+        for meta in ("draft", ["draft"], 3, [], 0, False, ""):
+            with self.subTest(meta=meta), self.assertRaises(SpecError):
+                validate_spec(minimal_spec(meta=meta))
+
+    def test_missing_or_null_meta_means_none(self):
+        self.assertEqual(validate_spec(minimal_spec()).meta, {})
+        self.assertEqual(validate_spec(minimal_spec(meta=None)).meta, {})
+        self.assertEqual(validate_spec(minimal_spec(meta={})).meta, {})
+
+    def test_unreadable_spec_is_a_spec_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(valuecase.main([tmp, "--check"]), 2)
+            self.assertIn("spec error: cannot read", err.getvalue())
+
+
+class TestMarginOfSafety(unittest.TestCase):
+    """The headline's margin sentence must stay true after rounding."""
+
+    def margin(self, cost):
+        case = validate_spec(one_year_spec(cost))
+        return dict(case.headline())["Margin of safety"]
+
+    def test_any_cost_keeps_the_margin_under_100_percent(self):
+        """At 100% below plan there is no benefit and NPV is minus the cost,
+        so 99.5% must not round up to 100%."""
+        expected = {
+            5: "99.5%",
+            4: "99.6%",
+            1: "99.9%",
+            1e-12: "99.9%",
+            1e-20: "99.9%",
+            6: "99%",
+            170: "83%",
+        }
+        for cost, share in expected.items():
+            with self.subTest(cost=cost):
+                self.assertEqual(
+                    self.margin(cost),
+                    "benefits can come in %s below plan and still break even" % share,
+                )
+
+    def test_no_cost_at_all_breaks_even_without_benefits(self):
+        """With no cost and no benefit NPV is exactly zero: break-even, not
+        clearing zero, so the margin and the floor verdict agree."""
+        self.assertEqual(
+            self.margin(0),
+            "no cost to recover — the case breaks even with no benefits at all",
+        )
+
+
+class TestFloorVerdict(unittest.TestCase):
+    """The floor verdict must agree with the floor NPV printed above it."""
+
+    def floor_at(self, cost, low=0.5):
+        """b falls to ``low`` at the floor: a floor NPV of 1000 * low - cost."""
+        return validate_spec(
+            one_year_spec(
+                cost,
+                b={
+                    "value": 1,
+                    "confidence": "assumption",
+                    "source": "Observed between 0.5 and 1.5 at two peers",
+                    "low": low,
+                    "high": 1.5,
+                },
+            )
+        )
+
+    def test_a_floor_of_exactly_zero_is_not_called_negative(self):
+        case = self.floor_at(500)
+        self.assertEqual(case.floor_case()["npv"], 0)
+        self.assertFalse(case.floor_case()["still_positive"])
+        self.assertFalse(case.sensitivity()[0]["flips_decision"])
+        for text in (case.to_markdown(), case.to_html()):
+            plain = re.sub(r"<[^>]+>|\*\*", "", text)
+            floor = plain.split("Floor case", 1)[1].split("Assumption ledger", 1)[0]
+            with self.subTest(text=text[:20]):
+                self.assertIn("NPV at the floor: $0 (-$500 vs base)", floor)
+                self.assertIn(valuecase.FLOOR_FAILS, floor)
+                self.assertNotIn("negative", floor)
+
+    def test_the_verdict_follows_the_sign_of_the_floor(self):
+        self.assertIn(valuecase.FLOOR_FAILS, self.floor_at(501).to_markdown())
+        self.assertIn(valuecase.FLOOR_HOLDS[0], self.floor_at(499).to_markdown())
+
+    def test_no_cost_and_a_floor_of_zero_tell_one_story(self):
+        """With no cost, a floor that loses every benefit is exactly zero."""
+        case = self.floor_at(0, low=0)
+        self.assertEqual(case.floor_case()["npv"], 0)
+        markdown = case.to_markdown()
+        self.assertIn(valuecase.FLOOR_FAILS, markdown)
+        self.assertIn("breaks even with no benefits at all", markdown)
+        self.assertNotIn("clears zero even with no benefits", markdown)
+
+
 class TestShippedExample(unittest.TestCase):
     """The example the README quotes must keep loading and keep its shape."""
 
@@ -446,6 +642,36 @@ class TestShippedExample(unittest.TestCase):
             if line.startswith("|"):
                 # Escaped pipes are fine; raw ones inside a cell are not.
                 self.assertNotIn("||", line)
+
+
+class TestSameOutputOnEveryPython(unittest.TestCase):
+    """Identical input gives identical bytes on every supported Python."""
+
+    def test_a_total_on_a_rounding_boundary_prints_the_same_everywhere(self):
+        """Python 3.9 summed these cents to 619449.9999999999 ($619.4k) and
+        3.12 to 619450.0 ($619.5k), in the headline and the cost table."""
+        with open(EXAMPLE, encoding="utf-8") as handle:
+            raw = json.load(handle)
+        raw["costs"] = [
+            {
+                "id": "all",
+                "label": "All costs",
+                "schedule": [69151.48, 166414.54, 318846.41, 65037.57],
+            }
+        ]
+        case = validate_spec(raw)
+        self.assertEqual(case.summary()["total_investment"], 619450.0)
+        self.assertEqual(dict(case.headline())["Total investment"], "$619.5k")
+        self.assertRegex(case.to_markdown(), r"\| All costs \| \$619\.5k +\|")
+        html = case.to_html()
+        self.assertIn(">$619.5k</div>", html)
+        self.assertIn('data-label="Total">$619.5k</td>', html)
+
+    def test_the_example_model_is_exactly_the_same(self):
+        """3.9 wrote "swing": 311568.8939999999 where 3.12 wrote 311568.894."""
+        case = load_spec(EXAMPLE)
+        self.assertEqual(repr(case.sensitivity()[0]["swing"]), "311568.894")
+        self.assertEqual(repr(case.summary()["npv"]), "105193.0378578717")
 
 
 class TestAdverseBounds(unittest.TestCase):

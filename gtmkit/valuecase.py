@@ -5,6 +5,7 @@ Run it directly::
     python3 -m gtmkit.valuecase path/to/case.json
     python3 -m gtmkit.valuecase path/to/case.json --format json
     python3 -m gtmkit.valuecase path/to/case.json --out case.md
+    python3 -m gtmkit.valuecase path/to/case.json --format html --out case.html
 
 The spec format is documented in ``skills/value-case/references/spec-format.md``
 and validated by :func:`validate_spec`. The short version::
@@ -63,6 +64,7 @@ import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from . import finance
+from .cli import emit
 from .evidence import (
     EvidenceError,
     Input,
@@ -81,6 +83,43 @@ __all__ = [
     "main",
     "validate_spec",
 ]
+
+# Sentences the markdown brief and the HTML report (gtmkit.report) both print,
+# defined once so the two renderers cannot drift apart.
+NO_RANGE_NOTE = (
+    "No input declared a range, so no sensitivity could be run. Add low/high "
+    "bounds to the assumptions — a case without a stated range invites the "
+    "reader to invent their own."
+)
+FLOOR_NOTE = (
+    "Every ranged input simultaneously at its unfavorable bound. This is a "
+    "stress test, not a forecast or a guaranteed minimum. Bounds are selected "
+    "one at a time against the base; interactions and non-monotonic formulas "
+    "may produce worse outcomes within the ranges."
+)
+# (verdict, what to do with it). The markdown bolds the verdict.
+FLOOR_HOLDS = (
+    "The case still clears zero even at the floor.",
+    " That is the strongest sentence available here — lead with it.",
+)
+# The other side of the same test (floor NPV > 0), so it holds for a floor of
+# exactly zero as well as a negative one.
+FLOOR_FAILS = (
+    "The case does not clear zero at the floor. Say so, and name which input "
+    "has to hold for it to."
+)
+# What either footer may truthfully say: the ledger, sources, notes and meta
+# are the spec's own words and numbers, so only the computed figures are the
+# library's. The spec's numbers are shown at display precision (1234.5 as
+# 1,234, a 12.5% rate as 12%), so they are not "as written" either.
+PROVENANCE = (
+    "Every computed figure above comes from the declared inputs through a "
+    "tested library; the inputs, sources and other text come from the spec, "
+    "with numbers rounded for display."
+)
+# The markdown brief lists this many attribution and sensitivity rows and says
+# how many it left out; the HTML report and the JSON model carry every row.
+BRIEF_ROWS = 12
 
 
 class SpecError(ValueError):
@@ -167,7 +206,7 @@ class Driver:
                 moved = base
             movements[name] = abs(moved - base)
 
-        total = sum(movements.values())
+        total = math.fsum(movements.values())
         if total <= 0:
             # Degenerate driver (constant formula, or all inputs inert).
             # Split evenly rather than divide by zero.
@@ -425,6 +464,43 @@ class ValueCase:
 
     # -- output ----------------------------------------------------------
 
+    def basis(self) -> str:
+        """The one-line statement of horizon, discount rate, and currency."""
+        return "%d-year case, discounted at %s annually. All figures in %s." % (
+            self.horizon,
+            fmt_pct(self.discount_rate),
+            self.currency,
+        )
+
+    def headline(self) -> List[Tuple[str, str]]:
+        """The headline block as ``(metric, value)`` pairs.
+
+        Every renderer leads with these, built here once so the markdown brief
+        and the HTML report cannot disagree about the decision-relevant facts.
+        """
+        cur = self.currency
+        summary = self.summary()
+        if summary["irr_is_ambiguous"]:
+            irr = "multiple cash flow sign changes (use NPV)"
+        elif summary["irr_annual"] is None:
+            irr = "no IRR found in the search range"
+        else:
+            irr = fmt_pct(summary["irr_annual"])
+        return [
+            ("Net present value", fmt_currency(summary["npv"], cur)),
+            ("Discounted payback", fmt_periods(summary["discounted_payback_periods"])),
+            ("IRR", irr),
+            ("Total investment", fmt_currency(summary["total_investment"], cur)),
+            ("Total modeled benefit", fmt_currency(summary["total_benefit"], cur)),
+            ("Margin of safety", _margin_of_safety(summary)),
+        ]
+
+    def to_html(self) -> str:
+        """A self-contained HTML report; see :mod:`gtmkit.report`."""
+        from .report import render_value_case  # report imports this module
+
+        return render_value_case(self)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
@@ -451,39 +527,20 @@ class ValueCase:
 
     def to_markdown(self) -> str:
         cur = self.currency
-        summary = self.summary()
         evidence = self.evidence()
         floor = self.floor_case()
 
         lines: List[str] = []
         lines.append("# %s" % self.name)
         lines.append("")
-        lines.append(
-            "%d-year case, discounted at %s annually. All figures in %s."
-            % (self.horizon, fmt_pct(self.discount_rate), cur)
-        )
+        lines.append(self.basis())
         lines.append("")
 
         # Headline metrics first: a reader who stops after this block should
         # still have the decision-relevant facts.
         lines.append("## Headline")
         lines.append("")
-        headline_rows = [
-            ["Net present value", fmt_currency(summary["npv"], cur)],
-            [
-                "Discounted payback",
-                fmt_periods(summary["discounted_payback_periods"]),
-            ],
-            [
-                "IRR",
-                fmt_pct(summary["irr_annual"])
-                if summary["irr_annual"] is not None
-                else "not meaningful for this cash flow shape",
-            ],
-            ["Total investment", fmt_currency(summary["total_investment"], cur)],
-            ["Total modeled benefit", fmt_currency(summary["total_benefit"], cur)],
-            ["Margin of safety", _margin_of_safety(summary)],
-        ]
+        headline_rows = [list(row) for row in self.headline()]
         lines.append(table(["Metric", "Value"], headline_rows))
         lines.append("")
 
@@ -538,6 +595,7 @@ class ValueCase:
             "carrying the most weight in the entire case."
         )
         lines.append("")
+        attribution = self.evidence_by_input()
         attribution_rows = [
             [
                 "%s / %s" % (row["driver_label"], row["input"]),
@@ -545,7 +603,7 @@ class ValueCase:
                 fmt_pct(row["share_of_driver"]),
                 fmt_currency(row["npv_attributed"], cur),
             ]
-            for row in self.evidence_by_input()[:12]
+            for row in attribution[:BRIEF_ROWS]
         ]
         lines.append(
             table(
@@ -553,6 +611,7 @@ class ValueCase:
                 attribution_rows,
             )
         )
+        lines.extend(_rows_left_out(len(attribution), "inputs carrying less value"))
         lines.append("")
 
         lines.append("## Cash flow")
@@ -587,6 +646,7 @@ class ValueCase:
             "else holds at base. Sorted by how much the decision moves."
         )
         lines.append("")
+        sensitivity = self.sensitivity()
         sens_rows = [
             [
                 "%s / %s" % (row["driver_label"], row["input"]),
@@ -596,7 +656,7 @@ class ValueCase:
                 fmt_currency(row["npv_high"], cur),
                 "yes" if row["flips_decision"] else "no",
             ]
-            for row in self.sensitivity()[:12]
+            for row in sensitivity[:BRIEF_ROWS]
         ]
         if sens_rows:
             lines.append(
@@ -612,22 +672,16 @@ class ValueCase:
                     sens_rows,
                 )
             )
-        else:
-            lines.append(
-                "_No input declared a range, so no sensitivity could be run. "
-                "Add low/high bounds to the assumptions — a case without a "
-                "stated range invites the reader to invent their own._"
+            lines.extend(
+                _rows_left_out(len(sensitivity), "ranged inputs that move NPV less")
             )
+        else:
+            lines.append("_%s_" % NO_RANGE_NOTE)
         lines.append("")
 
         lines.append("## Floor case")
         lines.append("")
-        lines.append(
-            "Every ranged input simultaneously at its unfavorable bound. This "
-            "is a stress test, not a forecast or a guaranteed minimum. Bounds "
-            "are selected one at a time against the base; interactions and "
-            "non-monotonic formulas may produce worse outcomes within the ranges."
-        )
+        lines.append(FLOOR_NOTE)
         lines.append("")
         lines.append(
             "- NPV at the floor: **%s** (%s vs base)"
@@ -642,13 +696,7 @@ class ValueCase:
         )
         lines.append(
             "- %s"
-            % (
-                "**The case still clears zero even at the floor.** That is the "
-                "strongest sentence available here — lead with it."
-                if floor["still_positive"]
-                else "The case goes negative at the floor. Say so, and name "
-                "which input has to hold for it not to."
-            )
+            % ("**%s**%s" % FLOOR_HOLDS if floor["still_positive"] else FLOOR_FAILS)
         )
         lines.append("")
 
@@ -691,7 +739,7 @@ class ValueCase:
             cost_rows = [
                 [
                     cost.label,
-                    fmt_currency(sum(cost.schedule), cur),
+                    fmt_currency(math.fsum(cost.schedule), cur),
                     cost.note or "",
                 ]
                 for cost in self.costs
@@ -703,10 +751,20 @@ class ValueCase:
         lines.append("")
         lines.append(
             "_Generated by [gtm-skills](https://github.com/erickdronski/gtm-skills). "
-            "Every figure above is computed from the declared inputs by a tested "
-            "library — no number in this document was written by hand._"
+            "%s_" % PROVENANCE
         )
         return "\n".join(lines)
+
+
+def _rows_left_out(total: int, what: str) -> List[str]:
+    """The note under a brief table cut at :data:`BRIEF_ROWS`, or nothing."""
+    if total <= BRIEF_ROWS:
+        return []
+    return [
+        "",
+        "_%d more %s are not listed here; `--format html` and `--format json` "
+        "include every one._" % (total - BRIEF_ROWS, what),
+    ]
 
 
 def _margin_of_safety(summary: Mapping[str, Any]) -> str:
@@ -721,11 +779,18 @@ def _margin_of_safety(summary: Mapping[str, Any]) -> str:
     if multiplier is None:
         return "n/a — no modeled benefit to shrink"
     if multiplier <= 0:
-        return "case clears zero even with no benefits at all"
+        # Only a case whose costs are all zero gets here. With no benefit
+        # either its NPV is exactly zero: it breaks even, it does not clear
+        # zero, which is what the floor verdict would say of it.
+        return "no cost to recover — the case breaks even with no benefits at all"
     if multiplier < 1:
-        return "benefits can come in %s below plan and still break even" % fmt_pct(
-            1 - multiplier
-        )
+        share = fmt_pct(1 - multiplier)
+        if share == "100%":
+            # 100% below plan is no benefit at all, which leaves any cost
+            # unpaid. A margin of 99.5% rounds up to that, so it is cut down
+            # to a tenth of a point instead: 99.5%, and never past 99.9%.
+            share = fmt_pct(min(math.floor((1 - multiplier) * 1000), 999) / 1000, 1)
+        return "benefits can come in %s below plan and still break even" % share
     return "none — benefits must exceed plan by %s just to break even" % fmt_pct(
         multiplier - 1
     )
@@ -811,6 +876,17 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
             "at least the subscription and the implementation effort."
         )
 
+    # Only a missing or null meta means "none": [], 0, false and "" are not
+    # objects either, and are refused like any other non-object.
+    meta = spec.get("meta")
+    if meta is None:
+        meta = {}
+    if not isinstance(meta, Mapping):
+        raise SpecError(
+            "'meta' must be an object, e.g. "
+            '{"prepared_for": "...", "decision_date": "2026-09-30"}'
+        )
+
     return ValueCase(
         name=name,
         currency=currency,
@@ -818,7 +894,7 @@ def validate_spec(spec: Mapping[str, Any]) -> ValueCase:
         discount_rate=float(rate),
         drivers=drivers,
         costs=costs,
-        meta=spec.get("meta") or {},
+        meta=meta,
     )
 
 
@@ -984,6 +1060,10 @@ def load_spec(path: str) -> ValueCase:
         raise SpecError("no such spec file: %s" % path)
     except json.JSONDecodeError as exc:
         raise SpecError("%s is not valid JSON: %s" % (path, exc)) from exc
+    except UnicodeDecodeError as exc:
+        raise SpecError("%s is not UTF-8 text: %s" % (path, exc)) from exc
+    except OSError as exc:
+        raise SpecError("cannot read %s: %s" % (path, exc.strerror or exc)) from exc
     return validate_spec(raw)
 
 
@@ -995,18 +1075,19 @@ def build(spec: Mapping[str, Any]) -> ValueCase:
 # -- CLI ------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.valuecase",
+        prog=prog or "python3 -m gtmkit.valuecase",
         description=(
             "Build an auditable business case from a declarative spec. "
-            "Outputs a markdown brief or the full JSON model."
+            "Outputs a markdown brief, a self-contained HTML report to "
+            "share, or the full JSON model."
         ),
     )
     parser.add_argument("spec", help="path to the business-case JSON spec")
     parser.add_argument(
         "--format",
-        choices=("markdown", "json"),
+        choices=("markdown", "json", "html"),
         default="markdown",
         help="output format (default: markdown)",
     )
@@ -1023,7 +1104,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         case = load_spec(args.spec)
-    except (SpecError, EvidenceError, ExpressionError) as exc:
+        # Building the whole model is part of the check: a range bound that
+        # divides by zero is only reached when the sensitivity runs.
+        model = case.to_dict()
+        if args.check:
+            output = ""
+        elif args.format == "json":
+            output = json.dumps(model, indent=2, sort_keys=False)
+        elif args.format == "html":
+            output = case.to_html()
+        else:
+            output = case.to_markdown()
+    except (
+        SpecError,
+        EvidenceError,
+        ExpressionError,
+        finance.InvalidCashFlows,
+    ) as exc:
         sys.stderr.write("spec error: %s\n" % exc)
         return 2
 
@@ -1033,19 +1130,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             % (args.spec, len(case.drivers), len(case.costs), case.horizon)
         )
         return 0
-
-    if args.format == "json":
-        output = json.dumps(case.to_dict(), indent=2, sort_keys=False)
-    else:
-        output = case.to_markdown()
-
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover

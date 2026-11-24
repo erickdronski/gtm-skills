@@ -16,7 +16,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
+from gtmkit import qualify as qualify_module
 from gtmkit.qualify import (
     QualificationRubric,
     QualifyError,
@@ -484,6 +486,36 @@ class TestRubricValidation(unittest.TestCase):
         rubric = QualificationRubric(self.raw())
         self.assertEqual(len(rubric.stages), 6)
         self.assertEqual(rubric.paper_lead_days, 42)
+
+    def test_the_skills_copy_is_read_when_it_is_there(self):
+        where, _ = qualify_module._shipped_rubric()
+        self.assertEqual(where, qualify_module.DEFAULT_RUBRIC)
+
+    def test_without_skills_the_copy_inside_the_package_is_read(self):
+        """A pip install ships gtmkit/ without skills/ beside it."""
+        missing = os.path.join(REPO_ROOT, "no-such-dir", "meddpicc-rubric.json")
+        with mock.patch.object(qualify_module, "DEFAULT_RUBRIC", missing):
+            where, _ = qualify_module._shipped_rubric()
+            rubric = load_rubric()
+        self.assertTrue(
+            where.endswith(os.path.join("gtmkit", "data", "meddpicc-rubric.json")),
+            where,
+        )
+        shipped = QualificationRubric(self.raw())
+        self.assertEqual(rubric.name, shipped.name)
+        self.assertEqual(rubric.stages, shipped.stages)
+        self.assertEqual(list(rubric.elements), list(shipped.elements))
+
+    def test_no_shipped_rubric_at_all_is_a_clear_error(self):
+        missing = os.path.join(REPO_ROOT, "no-such-dir", "meddpicc-rubric.json")
+        with (
+            mock.patch.object(qualify_module, "DEFAULT_RUBRIC", missing),
+            mock.patch.object(qualify_module, "PACKAGED_RUBRIC", ("data", "x.json")),
+            self.assertRaises(QualifyError) as ctx,
+        ):
+            load_rubric()
+        self.assertIn("rubric is missing", str(ctx.exception))
+        self.assertIn("--rubric", str(ctx.exception))
 
     def test_requires_stages(self):
         raw = self.raw()

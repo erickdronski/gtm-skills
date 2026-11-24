@@ -38,6 +38,7 @@ import re
 import sys
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from .cli import emit, open_input
 from .evidence import EvidenceError, grade_evidence, validate_input
 from .fmt import fmt_currency, fmt_pct, table
 from .scoring import RubricError, load_records
@@ -1183,9 +1184,9 @@ def to_markdown(result: Mapping[str, Any]) -> str:
 # -- CLI -----------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python3 -m gtmkit.pipeline",
+        prog=prog or "python3 -m gtmkit.pipeline",
         description=(
             "Pipeline coverage, a weighted forecast with its spread, the "
             "commit view, and hygiene flags, from a pipeline export."
@@ -1232,7 +1233,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         if args.stages:
-            with open(args.stages, "r", encoding="utf-8") as handle:
+            with open_input(args.stages, PipelineError) as handle:
                 model = load_stage_model(json.load(handle))
         else:
             model = default_stage_model()
@@ -1267,13 +1268,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     output = (
         json.dumps(result, indent=2) if args.format == "json" else to_markdown(result)
     )
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as handle:
-            handle.write(output + "\n")
-        sys.stderr.write("wrote %s\n" % args.out)
-    else:
-        sys.stdout.write(output + "\n")
-    return 0
+    return emit(output, args.out)
 
 
 if __name__ == "__main__":  # pragma: no cover
