@@ -1276,7 +1276,7 @@ tr:last-child td { border-bottom: 0; }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 0; padding-left: 12px; overflow-wrap: normal; }
 td.n:not(:last-child), th.n:not(:last-child) { padding-right: 16px; }
 td.nowrap { white-space: nowrap; overflow-wrap: normal; }
-td.n.wrap { white-space: normal; min-width: 6em; }
+td.n.wrap { min-width: 6em; }
 td.label { min-width: 8em; }
 td.src { color: var(--ink-2); min-width: 200px; overflow-wrap: anywhere; }
 td .under { display: block; color: var(--muted); font-size: 12px; }
@@ -1287,6 +1287,11 @@ td .under { display: block; color: var(--muted); font-size: 12px; }
 footer { margin-top: 22px; font-size: 12.5px; color: var(--muted); }
 footer a { color: inherit; }
 
+/* A value with a long unit ("1.8 minutes per ticket") may wrap where the
+   ledger is squeezed: a window under 1000px, or paper. */
+@media screen and (max-width: 1000px) {
+  td.n.wrap { white-space: normal; }
+}
 @media screen and (max-width: 760px) {
   .report { padding: 24px 14px 40px; }
   section { padding: 18px 16px; }
@@ -1339,6 +1344,7 @@ footer a { color: inherit; }
   body { font-size: 11pt; }
   .report { max-width: none; padding: 0; }
   .table-wrap { overflow: visible; }
+  td.n.wrap { white-space: normal; }
   section { break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
